@@ -1,5 +1,6 @@
 package com.potionboost;
 
+import com.google.common.collect.ImmutableSet;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
@@ -11,18 +12,25 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.itemstats.Effect;
 import net.runelite.client.plugins.itemstats.ItemStatChanges;
+import net.runelite.client.plugins.itemstats.ItemStatConfig;
+import net.runelite.client.plugins.itemstats.Positivity;
 import net.runelite.client.plugins.itemstats.StatChange;
 import net.runelite.client.plugins.itemstats.StatsChanges;
+import net.runelite.client.plugins.itemstats.stats.Stat;
+import net.runelite.client.plugins.itemstats.stats.Stats;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -41,6 +49,31 @@ class PotionBoostOverlay extends Overlay
 	};
 
 	private static final int SLOTS = 28;
+
+	/**
+	 * The seven skills a fight is had with, which is what the rows are kept to until they are asked for
+	 * everywhere.
+	 */
+	private static final Set<Stat> COMBAT = ImmutableSet.of(
+		Stats.ATTACK,
+		Stats.STRENGTH,
+		Stats.DEFENCE,
+		Stats.RANGED,
+		Stats.MAGIC,
+		Stats.HITPOINTS,
+		Stats.PRAYER);
+
+	/**
+	 * The butterflies and the moths, which are drunk the way a potion is but are caught rather than
+	 * brewed, so there are no doses in their names to recognise them by.
+	 */
+	private static final Set<Integer> JARRED = ImmutableSet.of(
+		ItemID.BUTTERFLY_JAR_RUBY,
+		ItemID.BUTTERFLY_JAR_WARLOCK,
+		ItemID.BUTTERFLY_JAR_GLACIALIS,
+		ItemID.BUTTERFLY_JAR_SNOWY,
+		ItemID.BUTTERFLY_JAR_SUNMOTH,
+		ItemID.BUTTERFLY_JAR_MOONMOTH);
 
 	/**
 	 * The doses a potion has left, which is the end of its name and the only thing telling two of the
@@ -76,19 +109,25 @@ class PotionBoostOverlay extends Overlay
 	private final PotionBoostConfig config;
 
 	/**
+	 * The colours Item Stats puts its own numbers in, read from that plugin rather than kept here, so a
+	 * colour changed there is the colour a potion is labelled in.
+	 */
+	private final ItemStatConfig colours;
+
+	/**
 	 * The outlined icons, by sprite and by the height they were prepared at, since outlining one is work
 	 * that only has to happen once and finding it again is work for every row of every frame.
 	 */
 	private final Map<Integer, BufferedImage> icons = new HashMap<>();
 
 	/**
-	 * What each item in the inventory would boost, and the tick that was worked out on. The answer
+	 * What each item in the inventory would change, and the tick that was worked out on. The answer
 	 * depends on the levels you are at, so it is thrown away once a tick rather than kept, and worked
 	 * out once a tick rather than once a frame.
 	 */
-	private final Map<Integer, List<StatChange>> boosts = new HashMap<>();
+	private final Map<Integer, List<StatChange>> changes = new HashMap<>();
 
-	private int boostsTick = -1;
+	private int changesTick = -1;
 
 	@Inject
 	PotionBoostOverlay(
@@ -96,14 +135,21 @@ class PotionBoostOverlay extends Overlay
 		ItemManager itemManager,
 		ItemStatChanges statChanges,
 		SpriteManager spriteManager,
+		ConfigManager configManager,
 		PotionBoostConfig config)
 	{
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
+
+		// Drawn before the other overlays, so that anything else labelling a slot, a dose count in the
+		// corner of it most of all, lands on top of this rather than under it
+		setPriority(PRIORITY_LOW);
+
 		this.client = client;
 		this.itemManager = itemManager;
 		this.statChanges = statChanges;
 		this.spriteManager = spriteManager;
+		this.colours = configManager.getConfig(ItemStatConfig.class);
 		this.config = config;
 	}
 
@@ -156,17 +202,17 @@ class PotionBoostOverlay extends Overlay
 	}
 
 	/**
-	 * Every slot holding something that would put a skill above where it is trained to, in the order the
-	 * slots are filled, which reads left to right from the top.
+	 * Every slot holding something there is a row to put on, in the order the slots are filled, which
+	 * reads left to right from the top.
 	 */
 	private List<Potion> potionsIn(Widget container)
 	{
 		List<Potion> potions = new ArrayList<>();
 
-		if (boostsTick != client.getTickCount())
+		if (changesTick != client.getTickCount())
 		{
-			boosts.clear();
-			boostsTick = client.getTickCount();
+			changes.clear();
+			changesTick = client.getTickCount();
 		}
 
 		for (int slot = 0; slot < SLOTS; slot++)
@@ -178,11 +224,11 @@ class PotionBoostOverlay extends Overlay
 				continue;
 			}
 
-			List<StatChange> changes = boosts.computeIfAbsent(child.getItemId(), this::boostsOf);
+			List<StatChange> shown = shown(changes.computeIfAbsent(child.getItemId(), this::changesOf));
 
-			if (!changes.isEmpty())
+			if (!shown.isEmpty())
 			{
-				potions.add(new Potion(child.getBounds(), changes, child.getItemId()));
+				potions.add(new Potion(child.getBounds(), shown, child.getItemId()));
 			}
 		}
 
@@ -190,12 +236,12 @@ class PotionBoostOverlay extends Overlay
 	}
 
 	/**
-	 * What drinking an item now would raise above the level it is trained to. Anything the game has stats
-	 * for is asked, so a boost is one that lands over the maximum rather than one off a list of potions,
-	 * which leaves out food and the potions that only put back what has been used, and leaves out a
-	 * boost you are already holding, since there is nothing left there to gain.
+	 * What drinking an item now would do to the skills it touches, asked of the game rather than kept
+	 * here as a list of potions, so the mixes, the divines and the brews are read the same way a plain
+	 * super strength is. A skill it would leave where it already is drops out, which is what takes a
+	 * boost off a slot once the boost is on.
 	 */
-	private List<StatChange> boostsOf(int item)
+	private List<StatChange> changesOf(int item)
 	{
 		Effect effect = statChanges.get(item);
 
@@ -204,39 +250,62 @@ class PotionBoostOverlay extends Overlay
 			return List.of();
 		}
 
-		StatsChanges changes = effect.calculate(client);
+		StatsChanges stats = effect.calculate(client);
 
-		if (changes == null || changes.getStatChanges() == null)
+		if (stats == null || stats.getStatChanges() == null)
 		{
 			return List.of();
 		}
 
-		List<StatChange> boosted = new ArrayList<>();
+		List<StatChange> changed = new ArrayList<>();
 
-		for (StatChange change : changes.getStatChanges())
+		for (StatChange change : stats.getStatChanges())
 		{
 			if (change != null
-				&& change.getRelative() > 0
-				&& change.getAbsolute() > change.getStat().getMaximum(client)
+				&& change.getRelative() != 0
 				&& SkillIcons.of(change.getStat()) != SkillIcons.NONE)
 			{
-				boosted.add(change);
+				changed.add(change);
 			}
 		}
 
-		return boosted;
+		return changed;
+	}
+
+	/**
+	 * The rows left once the settings have had the skills you do not fight with out of them, and the
+	 * ones a potion takes away rather than gives.
+	 */
+	private List<StatChange> shown(List<StatChange> changed)
+	{
+		List<StatChange> shown = new ArrayList<>(changed.size());
+
+		for (StatChange change : changed)
+		{
+			if ((change.getRelative() > 0 || config.drains())
+				&& (!config.combatOnly() || COMBAT.contains(change.getStat())))
+			{
+				shown.add(change);
+			}
+		}
+
+		return shown;
 	}
 
 	/**
 	 * One of each potion, since labelling all four doses of a super strength says the same thing four
 	 * times over. A potion is the same potion as another when their names match but for the doses left
-	 * in them, and which one of those is kept is the setting: the first one, which is the one nearest the
-	 * top left, or the one with the least left in it, which is the one worth drinking first.
+	 * in them, and the one labelled is the one with the least left in it, which is the one worth
+	 * drinking first. Only when two are down to the same dose is there a choice left to make, and that
+	 * one is the setting: the first of them, which is the one nearest the top left, or the last.
+	 *
+	 * <p>Unless food is asked for, this is also where everything that is not a potion goes: what you
+	 * brew carries its doses in its name, and what you catch is in a jar.
 	 */
 	private List<Potion> chosen(List<Potion> potions)
 	{
 		Map<String, Potion> kept = new LinkedHashMap<>();
-		boolean byDose = config.which() == PotionBoostConfig.Which.SMALLEST_DOSE;
+		boolean last = config.prioritize() == PotionBoostConfig.Prioritize.BOTTOM_RIGHT;
 
 		for (Potion potion : potions)
 		{
@@ -244,13 +313,18 @@ class PotionBoostOverlay extends Overlay
 			Matcher dose = DOSE.matcher(name);
 			boolean dosed = dose.find();
 
+			if (!dosed && !JARRED.contains(potion.item) && !config.food())
+			{
+				continue;
+			}
+
 			potion.dose = dosed ? Integer.parseInt(dose.group(1)) : 0;
 
 			String key = dosed ? name.substring(0, dose.start()) : name;
 			Potion held = kept.get(key);
 
 			// The potions arrive in slot order, so the one already held is the one nearer the top left
-			if (held == null || byDose && potion.dose < held.dose)
+			if (held == null || potion.dose < held.dose || potion.dose == held.dose && last)
 			{
 				kept.put(key, potion);
 			}
@@ -261,6 +335,8 @@ class PotionBoostOverlay extends Overlay
 
 	/**
 	 * A row for each skill, stacked down the middle of the slot with the icon on the left of its number.
+	 * The number is in the colour Item Stats would have given it, so a boost that would go to waste
+	 * reads as one at a glance.
 	 */
 	private void draw(Graphics2D graphics, FontMetrics metrics, Potion potion)
 	{
@@ -289,7 +365,7 @@ class PotionBoostOverlay extends Overlay
 
 			graphics.setColor(Color.BLACK);
 			graphics.drawString(label, x + 1, baseline + 1);
-			graphics.setColor(Color.WHITE);
+			graphics.setColor(Positivity.getColor(colours, change.getPositivity()));
 			graphics.drawString(label, x, baseline);
 
 			y += height;
@@ -297,7 +373,7 @@ class PotionBoostOverlay extends Overlay
 	}
 
 	/**
-	 * A skill's icon with a black outline around it, which is what keeps it off the potion behind it. The
+	 * A skill icon with a black outline around it, which is what keeps it off the potion behind it. The
 	 * outline has to go somewhere, so the sprite is given a pixel of room on each side for it first.
 	 */
 	private BufferedImage icon(int sprite, int height)

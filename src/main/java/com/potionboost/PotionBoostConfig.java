@@ -13,10 +13,10 @@ public interface PotionBoostConfig extends Config
 		LEVEL
 	}
 
-	enum Which
+	enum Prioritize
 	{
 		TOP_LEFT,
-		SMALLEST_DOSE
+		BOTTOM_RIGHT
 	}
 
 	@ConfigItem(
@@ -31,13 +31,46 @@ public interface PotionBoostConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "which",
-		name = "Show it on",
-		description = "Which one it goes on when you are carrying several of the same potion",
+		keyName = "combatOnly",
+		name = "Combat only",
+		description = "Leave out the skills you do not fight with",
 		position = 2
 	)
-	default Which which()
+	default boolean combatOnly()
 	{
-		return Which.SMALLEST_DOSE;
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "drains",
+		name = "Show drains",
+		description = "Show what a potion takes away as well as what it gives",
+		position = 3
+	)
+	default boolean drains()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "food",
+		name = "Include food",
+		description = "Label food and drink too, not only the potions you brew",
+		position = 4
+	)
+	default boolean food()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "prioritize",
+		name = "Prioritize",
+		description = "Which one it goes on when several are down to the same dose",
+		position = 5
+	)
+	default Prioritize prioritize()
+	{
+		return Prioritize.TOP_LEFT;
 	}
 }
