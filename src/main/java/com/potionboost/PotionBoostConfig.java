@@ -89,12 +89,23 @@ public interface PotionBoostConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+		keyName = "noChange",
+		name = "Show no change",
+		description = "Label a skill with nothing left to gain as well",
+		position = 5
+	)
+	default boolean noChange()
+	{
+		return false;
+	}
+
 	@Range(max = 20)
 	@ConfigItem(
 		keyName = "minimum",
 		name = "Minimum",
-		description = "Leave out a skill that would move by less than this, or nothing to keep them all",
-		position = 5
+		description = "Leave out a skill that would move by less than this",
+		position = 6
 	)
 	default int minimum()
 	{
@@ -106,7 +117,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "transparency",
 		name = "Transparency",
 		description = "How far to see the potion through what is drawn over it",
-		position = 6
+		position = 7
 	)
 	default int transparency()
 	{
@@ -117,7 +128,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "prioritize",
 		name = "Prioritize",
 		description = "Which one it goes on when several are down to the same dose",
-		position = 7
+		position = 8
 	)
 	default Prioritize prioritize()
 	{
@@ -128,7 +139,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "shownSkills",
 		name = "Shown skills",
 		description = "Separated by commas, and read in place of combat only",
-		position = 8
+		position = 9
 	)
 	default String shownSkills()
 	{
@@ -139,7 +150,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "hiddenSkills",
 		name = "Hidden skills",
 		description = "Separated by commas, and left out whatever else would show them",
-		position = 9
+		position = 10
 	)
 	default String hiddenSkills()
 	{

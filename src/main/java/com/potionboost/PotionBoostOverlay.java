@@ -314,9 +314,9 @@ class PotionBoostOverlay extends Overlay
 	 * The rows left once the settings have had the skills you do not care about out of them, the ones a
 	 * potion takes away rather than gives, and the ones it would hardly move.
 	 *
-	 * <p>A minimum of nothing keeps the skills a potion would not move at all, which is the last of the
-	 * colours Item Stats has a setting for: a row with nothing left to gain reads in the no change
-	 * colour rather than going away.
+	 * <p>A skill a potion would not move at all has a setting of its own rather than a minimum of
+	 * nothing, since the minimum is about a skill that would hardly move. It is the last of the colours
+	 * Item Stats has a setting for: the row reads in the no change colour.
 	 */
 	private List<StatChange> shown(List<StatChange> changed)
 	{
@@ -325,9 +325,12 @@ class PotionBoostOverlay extends Overlay
 
 		for (StatChange change : changed)
 		{
-			if ((change.getRelative() >= 0 || config.drains())
-				&& Math.abs(change.getRelative()) >= minimum
-				&& wanted(change.getStat()))
+			int relative = change.getRelative();
+			boolean worth = relative == 0
+				? config.noChange()
+				: (relative > 0 || config.drains()) && Math.abs(relative) >= minimum;
+
+			if (worth && wanted(change.getStat()))
 			{
 				shown.add(change);
 			}
