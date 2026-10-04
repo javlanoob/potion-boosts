@@ -101,11 +101,23 @@ public interface PotionBoostConfig extends Config
 		return 1;
 	}
 
+	@Range(max = 100)
+	@ConfigItem(
+		keyName = "transparency",
+		name = "Transparency",
+		description = "How far to see the potion through what is drawn over it",
+		position = 6
+	)
+	default int transparency()
+	{
+		return 0;
+	}
+
 	@ConfigItem(
 		keyName = "prioritize",
 		name = "Prioritize",
 		description = "Which one it goes on when several are down to the same dose",
-		position = 6
+		position = 7
 	)
 	default Prioritize prioritize()
 	{

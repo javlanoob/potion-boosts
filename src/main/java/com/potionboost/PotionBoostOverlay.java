@@ -1,7 +1,9 @@
 package com.potionboost;
 
 import com.google.common.collect.ImmutableSet;
+import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Composite;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -54,23 +56,19 @@ class PotionBoostOverlay extends Overlay
 	private static final int SLOTS = COLUMNS * ROWS;
 
 	/**
-	 * The seven skills a fight is had with, which is what the rows are kept to until they are asked for
-	 * everywhere.
+	 * What is left when the skills you do not fight with are left out: the seven a fight is had with, and
+	 * run energy, which is not a skill to be choosing between in the first place and is run down fighting
+	 * the same as anywhere else.
 	 */
-	private static final Set<Stat> COMBAT = ImmutableSet.of(
+	private static final Set<Stat> FIGHTING = ImmutableSet.of(
 		Stats.ATTACK,
 		Stats.STRENGTH,
 		Stats.DEFENCE,
 		Stats.RANGED,
 		Stats.MAGIC,
 		Stats.HITPOINTS,
-		Stats.PRAYER);
-
-	/**
-	 * The two things an item can put back without that making it a potion. Everything else is a skill,
-	 * and run energy has no icon to be drawn with in any case.
-	 */
-	private static final Set<Stat> RESTED = ImmutableSet.of(Stats.HITPOINTS, Stats.RUN_ENERGY);
+		Stats.PRAYER,
+		Stats.RUN_ENERGY);
 
 	/**
 	 * The doses a potion has left, which is the end of its name and the only thing telling two of the
@@ -174,10 +172,22 @@ class PotionBoostOverlay extends Overlay
 		graphics.setFont(FontManager.getRunescapeSmallFont());
 		FontMetrics metrics = graphics.getFontMetrics();
 
+		// Put back afterwards, since the inventory is still being drawn around this
+		Composite composite = graphics.getComposite();
+		int transparency = config.transparency();
+
+		if (transparency > 0)
+		{
+			graphics.setComposite(
+				AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f - transparency / 100f));
+		}
+
 		for (Potion potion : chosen(potions))
 		{
 			draw(graphics, metrics, potion);
 		}
+
+		graphics.setComposite(composite);
 
 		return null;
 	}
@@ -243,10 +253,10 @@ class PotionBoostOverlay extends Overlay
 	 * super strength is. A skill it would leave where it already is drops out, which is what takes a
 	 * boost off a slot once the boost is on.
 	 *
-	 * <p>Whether it is a potion at all is worked out here as well, from the skills it touches rather
-	 * than from how far it moves them. Hitpoints are not one of them, because healing is what food does,
-	 * and neither is run energy. Anything else is a skill, so a super restore is a potion for the prayer
-	 * it puts back and a guthix rest is food for all that it carries doses in its name.
+	 * <p>Whether it is a potion at all is worked out here as well, from what it touches rather than from
+	 * how far it moves it. Food heals your hitpoints and does nothing else but put your run back, so a
+	 * guthix rest is food for all that it carries doses in its name. Everything else is a potion, which
+	 * is a super restore for the prayer it puts back and a stamina potion for the running.
 	 *
 	 * <p>The skills touched are read whether the item would move them this tick or not, so a potion
 	 * does not turn into food for as long as you have nothing to restore.
@@ -268,7 +278,8 @@ class PotionBoostOverlay extends Overlay
 		}
 
 		List<StatChange> changed = new ArrayList<>();
-		boolean potion = false;
+		boolean heals = false;
+		boolean skills = false;
 
 		for (StatChange change : stats.getStatChanges())
 		{
@@ -277,15 +288,18 @@ class PotionBoostOverlay extends Overlay
 				continue;
 			}
 
-			potion |= !RESTED.contains(change.getStat());
+			Stat stat = change.getStat();
 
-			if (change.getRelative() != 0 && SkillIcons.of(change.getStat()) != SkillIcons.NONE)
+			heals |= stat == Stats.HITPOINTS;
+			skills |= stat != Stats.HITPOINTS && stat != Stats.RUN_ENERGY;
+
+			if (change.getRelative() != 0 && SkillIcons.of(stat) != SkillIcons.NONE)
 			{
 				changed.add(change);
 			}
 		}
 
-		return new Item(changed, potion);
+		return new Item(changed, skills || !heals);
 	}
 
 	/**
@@ -300,7 +314,7 @@ class PotionBoostOverlay extends Overlay
 		{
 			if ((change.getRelative() > 0 || config.drains())
 				&& Math.abs(change.getRelative()) >= config.minimum()
-				&& (!config.combatOnly() || COMBAT.contains(change.getStat())))
+				&& (!config.combatOnly() || FIGHTING.contains(change.getStat())))
 			{
 				shown.add(change);
 			}
@@ -316,8 +330,8 @@ class PotionBoostOverlay extends Overlay
 	 * drinking first. Only when two are down to the same dose is there a choice left to make, and that
 	 * one is the setting: whichever of them is nearer the corner it names.
 	 *
-	 * <p>Unless food is asked for, this is also where food goes, which is anything doing nothing but
-	 * healing you and putting your run back.
+	 * <p>Unless food is asked for, this is also where food goes, which is anything that heals you and
+	 * does nothing else but put your run back.
 	 */
 	private List<Potion> chosen(List<Potion> potions)
 	{
