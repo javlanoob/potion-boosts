@@ -3,6 +3,7 @@ package com.potionboost;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
 @ConfigGroup("potionboost")
 public interface PotionBoostConfig extends Config
@@ -13,10 +14,35 @@ public interface PotionBoostConfig extends Config
 		LEVEL
 	}
 
+	/**
+	 * The corner of the inventory to work in from, for picking between potions that are down to the
+	 * same dose as each other.
+	 */
 	enum Prioritize
 	{
-		TOP_LEFT,
-		BOTTOM_RIGHT
+		TOP_LEFT(false, false),
+		TOP_RIGHT(false, true),
+		BOTTOM_LEFT(true, false),
+		BOTTOM_RIGHT(true, true);
+
+		private final boolean bottom;
+		private final boolean right;
+
+		Prioritize(boolean bottom, boolean right)
+		{
+			this.bottom = bottom;
+			this.right = right;
+		}
+
+		boolean isBottom()
+		{
+			return bottom;
+		}
+
+		boolean isRight()
+		{
+			return right;
+		}
 	}
 
 	@ConfigItem(
@@ -55,7 +81,7 @@ public interface PotionBoostConfig extends Config
 	@ConfigItem(
 		keyName = "food",
 		name = "Include food",
-		description = "Label food and drink too, not only the potions you brew",
+		description = "Label what only heals or restores too, not only what boosts",
 		position = 4
 	)
 	default boolean food()
@@ -63,11 +89,23 @@ public interface PotionBoostConfig extends Config
 		return false;
 	}
 
+	@Range(min = 1, max = 20)
+	@ConfigItem(
+		keyName = "minimum",
+		name = "Minimum",
+		description = "Leave out a skill that would move by less than this",
+		position = 5
+	)
+	default int minimum()
+	{
+		return 1;
+	}
+
 	@ConfigItem(
 		keyName = "prioritize",
 		name = "Prioritize",
 		description = "Which one it goes on when several are down to the same dose",
-		position = 5
+		position = 6
 	)
 	default Prioritize prioritize()
 	{
