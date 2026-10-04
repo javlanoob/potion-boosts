@@ -1,4 +1,4 @@
-package com.potionboost;
+package com.potionboosts;
 
 import com.google.common.collect.ImmutableSet;
 import java.awt.AlphaComposite;
@@ -40,7 +40,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.util.ImageUtil;
 
-class PotionBoostOverlay extends Overlay
+class PotionBoostsOverlay extends Overlay
 {
 	/**
 	 * The inventory, and the inventory as it is drawn beside an open bank, which is a different widget
@@ -103,7 +103,7 @@ class PotionBoostOverlay extends Overlay
 	private final ItemManager itemManager;
 	private final ItemStatChanges statChanges;
 	private final SpriteManager spriteManager;
-	private final PotionBoostConfig config;
+	private final PotionBoostsConfig config;
 
 	/**
 	 * The colours Item Stats puts its own numbers in, read from that plugin rather than kept here, so a
@@ -133,13 +133,13 @@ class PotionBoostOverlay extends Overlay
 	private final Listing hiding = new Listing();
 
 	@Inject
-	PotionBoostOverlay(
+	PotionBoostsOverlay(
 		Client client,
 		ItemManager itemManager,
 		ItemStatChanges statChanges,
 		SpriteManager spriteManager,
 		ConfigManager configManager,
-		PotionBoostConfig config)
+		PotionBoostsConfig config)
 	{
 		setPosition(OverlayPosition.DYNAMIC);
 
@@ -447,7 +447,7 @@ class PotionBoostOverlay extends Overlay
 	 */
 	private int corner(int slot)
 	{
-		PotionBoostConfig.Prioritize from = config.prioritize();
+		PotionBoostsConfig.Prioritize from = config.prioritize();
 		int row = slot / COLUMNS;
 		int column = slot % COLUMNS;
 
@@ -479,7 +479,7 @@ class PotionBoostOverlay extends Overlay
 				x += icon.getWidth();
 			}
 
-			String label = config.number() == PotionBoostConfig.Number.LEVEL
+			String label = config.number() == PotionBoostsConfig.Number.LEVEL
 				? Integer.toString(change.getAbsolute())
 				: change.getFormattedRelative();
 

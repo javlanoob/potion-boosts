@@ -1,13 +1,15 @@
-package com.potionboost;
+package com.potionboosts;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.Range;
 
-@ConfigGroup("potionboost")
-public interface PotionBoostConfig extends Config
+@ConfigGroup(PotionBoostsConfig.GROUP)
+public interface PotionBoostsConfig extends Config
 {
+	String GROUP = "potionboosts";
+
 	enum Number
 	{
 		BOOST,

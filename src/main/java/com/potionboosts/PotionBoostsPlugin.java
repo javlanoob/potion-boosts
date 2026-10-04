@@ -1,4 +1,4 @@
-package com.potionboost;
+package com.potionboosts;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
@@ -8,22 +8,22 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
-	name = "Potion Boost",
+	name = "Potion Boosts",
 	description = "Shows what a potion would boost on the potion itself",
 	tags = {"potion", "boost", "level", "skill", "stat", "inventory", "icons"}
 )
-public class PotionBoostPlugin extends Plugin
+public class PotionBoostsPlugin extends Plugin
 {
 	@Inject
 	private OverlayManager overlayManager;
 
 	@Inject
-	private PotionBoostOverlay overlay;
+	private PotionBoostsOverlay overlay;
 
 	@Provides
-	PotionBoostConfig provideConfig(ConfigManager configManager)
+	PotionBoostsConfig provideConfig(ConfigManager configManager)
 	{
-		return configManager.getConfig(PotionBoostConfig.class);
+		return configManager.getConfig(PotionBoostsConfig.class);
 	}
 
 	@Override

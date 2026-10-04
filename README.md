@@ -1,4 +1,4 @@
-# Potion Boost
+# Potion Boosts
 Draws the skill icons a potion in your inventory would move over the potion itself, each with how much it would give, or the level it would take you to.
 
 - Every item and every skill the Item Stats plugin knows about is labelled, run energy included, and the numbers are coloured the way that plugin colours its own, in the colours you have set there: green for a boost you would get all of, yellow for one that would partly go to waste, white for one with nothing left to gain, red for what a potion takes away.

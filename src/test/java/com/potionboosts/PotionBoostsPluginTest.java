@@ -1,13 +1,13 @@
-package com.potionboost;
+package com.potionboosts;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class PotionBoostPluginTest
+public class PotionBoostsPluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(PotionBoostPlugin.class);
+		ExternalPluginManager.loadBuiltin(PotionBoostsPlugin.class);
 		RuneLite.main(args);
 	}
 }

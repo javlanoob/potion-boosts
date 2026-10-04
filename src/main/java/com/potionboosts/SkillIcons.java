@@ -1,4 +1,4 @@
-package com.potionboost;
+package com.potionboosts;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
