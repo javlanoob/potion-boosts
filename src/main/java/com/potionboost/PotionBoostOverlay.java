@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
@@ -68,18 +67,10 @@ class PotionBoostOverlay extends Overlay
 		Stats.PRAYER);
 
 	/**
-	 * The butterflies and the moths, taken as Item Stats lists them, which are drunk the way a potion
-	 * is but are caught rather than brewed. The jars have no doses in their names to be recognised by,
-	 * and the mixes are here beside them so the two halves of the list stay the one list.
+	 * The two things an item can put back without that making it a potion. Everything else is a skill,
+	 * and run energy has no icon to be drawn with in any case.
 	 */
-	private static final Set<Integer> CAUGHT = ImmutableSet.of(
-		ItemID.BUTTERFLY_JAR_SUNMOTH, ItemID.HUNTER_MIX_SUNMOTH_1DOSE, ItemID.HUNTER_MIX_SUNMOTH_2DOSE,
-		ItemID.BUTTERFLY_JAR_MOONMOTH, ItemID.HUNTER_MIX_MOONMOTH_1DOSE, ItemID.HUNTER_MIX_MOONMOTH_2DOSE,
-		ItemID.BUTTERFLY_JAR_SNOWY, ItemID.HUNTER_MIX_SNOWY_1DOSE, ItemID.HUNTER_MIX_SNOWY_2DOSE,
-		ItemID.BUTTERFLY_JAR_RUBY, ItemID.HUNTER_MIX_RUBY_1DOSE, ItemID.HUNTER_MIX_RUBY_2DOSE,
-		ItemID.BUTTERFLY_JAR_WARLOCK, ItemID.HUNTER_MIX_WARLOCK_1DOSE, ItemID.HUNTER_MIX_WARLOCK_2DOSE,
-		ItemID.BUTTERFLY_JAR_GLACIALIS, ItemID.HUNTER_MIX_GLACIALIS_1DOSE,
-		ItemID.HUNTER_MIX_GLACIALIS_2DOSE);
+	private static final Set<Stat> RESTED = ImmutableSet.of(Stats.HITPOINTS, Stats.RUN_ENERGY);
 
 	/**
 	 * The doses a potion has left, which is the end of its name and the only thing telling two of the
@@ -239,7 +230,7 @@ class PotionBoostOverlay extends Overlay
 
 			if (!shown.isEmpty())
 			{
-				potions.add(new Potion(child.getBounds(), shown, child.getItemId(), slot, item.boosts));
+				potions.add(new Potion(child.getBounds(), shown, child.getItemId(), slot, item.potion));
 			}
 		}
 
@@ -252,9 +243,13 @@ class PotionBoostOverlay extends Overlay
 	 * super strength is. A skill it would leave where it already is drops out, which is what takes a
 	 * boost off a slot once the boost is on.
 	 *
-	 * <p>Whether any of that is a boost is worked out here as well: a boost is a change landing over
-	 * the level the skill is trained to, and an item without one of those only heals or restores, which
-	 * makes it food however it is drunk.
+	 * <p>Whether it is a potion at all is worked out here as well, from the skills it touches rather
+	 * than from how far it moves them. Hitpoints are not one of them, because healing is what food does,
+	 * and neither is run energy. Anything else is a skill, so a super restore is a potion for the prayer
+	 * it puts back and a guthix rest is food for all that it carries doses in its name.
+	 *
+	 * <p>The skills touched are read whether the item would move them this tick or not, so a potion
+	 * does not turn into food for as long as you have nothing to restore.
 	 */
 	private Item itemOf(int id)
 	{
@@ -273,25 +268,24 @@ class PotionBoostOverlay extends Overlay
 		}
 
 		List<StatChange> changed = new ArrayList<>();
-		boolean boosts = false;
+		boolean potion = false;
 
 		for (StatChange change : stats.getStatChanges())
 		{
-			if (change == null || change.getRelative() == 0)
+			if (change == null)
 			{
 				continue;
 			}
 
-			boosts |= change.getRelative() > 0
-				&& change.getAbsolute() > change.getStat().getMaximum(client);
+			potion |= !RESTED.contains(change.getStat());
 
-			if (SkillIcons.of(change.getStat()) != SkillIcons.NONE)
+			if (change.getRelative() != 0 && SkillIcons.of(change.getStat()) != SkillIcons.NONE)
 			{
 				changed.add(change);
 			}
 		}
 
-		return new Item(changed, boosts);
+		return new Item(changed, potion);
 	}
 
 	/**
@@ -322,10 +316,8 @@ class PotionBoostOverlay extends Overlay
 	 * drinking first. Only when two are down to the same dose is there a choice left to make, and that
 	 * one is the setting: whichever of them is nearer the corner it names.
 	 *
-	 * <p>Unless food is asked for, this is also where everything that is not a potion goes. A potion
-	 * boosts a skill over the level it is trained to, and carries its doses in its name or is one of
-	 * the butterflies, which are caught rather than brewed and so have no doses to be known by.
-	 * Anything that only heals or restores is food however it is drunk, guthix rest along with it.
+	 * <p>Unless food is asked for, this is also where food goes, which is anything doing nothing but
+	 * healing you and putting your run back.
 	 */
 	private List<Potion> chosen(List<Potion> potions)
 	{
@@ -333,14 +325,14 @@ class PotionBoostOverlay extends Overlay
 
 		for (Potion potion : potions)
 		{
-			String name = itemManager.getItemComposition(potion.item).getName();
-			Matcher dose = DOSE.matcher(name);
-			boolean dosed = dose.find();
-
-			if (!config.food() && !(potion.boosts && (dosed || CAUGHT.contains(potion.item))))
+			if (!config.food() && !potion.potion)
 			{
 				continue;
 			}
+
+			String name = itemManager.getItemComposition(potion.item).getName();
+			Matcher dose = DOSE.matcher(name);
+			boolean dosed = dose.find();
 
 			potion.dose = dosed ? Integer.parseInt(dose.group(1)) : 0;
 
@@ -546,15 +538,14 @@ class PotionBoostOverlay extends Overlay
 		private final List<StatChange> changes;
 
 		/**
-		 * Whether any of that lands over the level a skill is trained to, which is what tells a potion
-		 * from something that only heals or restores.
+		 * Whether it moves a skill rather than only healing you, which is what tells a potion from food.
 		 */
-		private final boolean boosts;
+		private final boolean potion;
 
-		private Item(List<StatChange> changes, boolean boosts)
+		private Item(List<StatChange> changes, boolean potion)
 		{
 			this.changes = changes;
-			this.boosts = boosts;
+			this.potion = potion;
 		}
 	}
 
@@ -564,16 +555,16 @@ class PotionBoostOverlay extends Overlay
 		private final List<StatChange> changes;
 		private final int item;
 		private final int slot;
-		private final boolean boosts;
+		private final boolean potion;
 		private int dose;
 
-		private Potion(Rectangle bounds, List<StatChange> changes, int item, int slot, boolean boosts)
+		private Potion(Rectangle bounds, List<StatChange> changes, int item, int slot, boolean potion)
 		{
 			this.bounds = bounds;
 			this.changes = changes;
 			this.item = item;
 			this.slot = slot;
-			this.boosts = boosts;
+			this.potion = potion;
 		}
 	}
 }
