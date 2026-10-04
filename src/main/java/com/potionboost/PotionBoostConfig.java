@@ -15,17 +15,6 @@ public interface PotionBoostConfig extends Config
 	}
 
 	/**
-	 * What to make of the skills listed by hand, which is nothing until there is something in the list
-	 * to go on.
-	 */
-	enum Skills
-	{
-		EVERYTHING,
-		ONLY_THESE,
-		ALL_BUT_THESE
-	}
-
-	/**
 	 * The corner of the inventory to work in from, for picking between potions that are down to the
 	 * same dose as each other.
 	 */
@@ -79,32 +68,10 @@ public interface PotionBoostConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "skills",
-		name = "Skills",
-		description = "Whether what is listed below is what to show or what to hide",
-		position = 3
-	)
-	default Skills skills()
-	{
-		return Skills.EVERYTHING;
-	}
-
-	@ConfigItem(
-		keyName = "skillList",
-		name = "Listed skills",
-		description = "Separated by commas, and read in place of combat only",
-		position = 4
-	)
-	default String skillList()
-	{
-		return "";
-	}
-
-	@ConfigItem(
 		keyName = "drains",
 		name = "Show drains",
 		description = "Show what a potion takes away as well as what it gives",
-		position = 5
+		position = 3
 	)
 	default boolean drains()
 	{
@@ -115,7 +82,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "food",
 		name = "Include food",
 		description = "Label what only heals or restores too, not only what boosts",
-		position = 6
+		position = 4
 	)
 	default boolean food()
 	{
@@ -127,7 +94,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "minimum",
 		name = "Minimum",
 		description = "Leave out a skill that would move by less than this, or nothing to keep them all",
-		position = 7
+		position = 5
 	)
 	default int minimum()
 	{
@@ -139,7 +106,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "transparency",
 		name = "Transparency",
 		description = "How far to see the potion through what is drawn over it",
-		position = 8
+		position = 6
 	)
 	default int transparency()
 	{
@@ -150,10 +117,32 @@ public interface PotionBoostConfig extends Config
 		keyName = "prioritize",
 		name = "Prioritize",
 		description = "Which one it goes on when several are down to the same dose",
-		position = 9
+		position = 7
 	)
 	default Prioritize prioritize()
 	{
 		return Prioritize.TOP_LEFT;
+	}
+
+	@ConfigItem(
+		keyName = "shownSkills",
+		name = "Shown skills",
+		description = "Separated by commas, and read in place of combat only",
+		position = 8
+	)
+	default String shownSkills()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "hiddenSkills",
+		name = "Hidden skills",
+		description = "Separated by commas, and left out whatever else would show them",
+		position = 9
+	)
+	default String hiddenSkills()
+	{
+		return "";
 	}
 }

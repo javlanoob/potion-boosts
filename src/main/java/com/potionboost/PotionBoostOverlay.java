@@ -126,13 +126,11 @@ class PotionBoostOverlay extends Overlay
 
 	private int itemsTick = -1;
 
-	/**
-	 * The skills named in the setting, and the setting they were read out of, so that taking a list apart
-	 * happens when it is written rather than for every row of every frame.
-	 */
-	private Set<String> listed = Set.of();
+	/** The skills to show, out of the setting they were written in. */
+	private final Listing showing = new Listing();
 
-	private String listedFrom = null;
+	/** The skills to leave out, out of the setting they were written in. */
+	private final Listing hiding = new Listing();
 
 	@Inject
 	PotionBoostOverlay(
@@ -339,48 +337,58 @@ class PotionBoostOverlay extends Overlay
 	}
 
 	/**
-	 * Whether a skill is one you asked to see. The list you write out takes the place of the combat
-	 * setting rather than being read on top of it, since the two together would leave you writing out a
-	 * skill and still not being shown it.
+	 * Whether a skill is one you asked to see. Writing out the skills to show takes the place of the
+	 * combat setting rather than being read on top of it, since the two together would leave you writing
+	 * out a skill and still not being shown it. The skills to leave out are read after either of them, so
+	 * a skill written into both lists is left out.
 	 */
 	private boolean wanted(Stat stat)
 	{
-		switch (config.skills())
+		if (hiding.has(config.hiddenSkills(), stat))
 		{
-			case ONLY_THESE:
-				return listed(stat);
-			case ALL_BUT_THESE:
-				return !listed(stat);
-			default:
-				return !config.combatOnly() || FIGHTING.contains(stat);
+			return false;
 		}
+
+		String written = config.shownSkills();
+
+		if (!written.trim().isEmpty())
+		{
+			return showing.has(written, stat);
+		}
+
+		return !config.combatOnly() || FIGHTING.contains(stat);
 	}
 
 	/**
-	 * Whether a skill was named in the list, taken apart as it was last written rather than for every row
-	 * of every frame. Spaces and capitals are ignored, so a run energy is found however it was typed.
+	 * The skills named in a setting, taken apart as it was last written rather than for every row of
+	 * every frame. Spaces and capitals are ignored, so a run energy is found however it was typed.
 	 */
-	private boolean listed(Stat stat)
+	private static class Listing
 	{
-		String written = config.skillList();
+		private Set<String> names = Set.of();
 
-		if (!written.equals(listedFrom))
+		private String from = null;
+
+		private boolean has(String written, Stat stat)
 		{
-			listedFrom = written;
-			listed = new HashSet<>();
-
-			for (String name : written.split(","))
+			if (!written.equals(from))
 			{
-				String trimmed = flattened(name);
+				from = written;
+				names = new HashSet<>();
 
-				if (!trimmed.isEmpty())
+				for (String name : written.split(","))
 				{
-					listed.add(trimmed);
+					String trimmed = flattened(name);
+
+					if (!trimmed.isEmpty())
+					{
+						names.add(trimmed);
+					}
 				}
 			}
-		}
 
-		return listed.contains(flattened(stat.getName()));
+			return names.contains(flattened(stat.getName()));
+		}
 	}
 
 	private static String flattened(String name)
