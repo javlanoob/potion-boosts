@@ -15,6 +15,17 @@ public interface PotionBoostConfig extends Config
 	}
 
 	/**
+	 * What to make of the skills listed by hand, which is nothing until there is something in the list
+	 * to go on.
+	 */
+	enum Skills
+	{
+		EVERYTHING,
+		ONLY_THESE,
+		ALL_BUT_THESE
+	}
+
+	/**
 	 * The corner of the inventory to work in from, for picking between potions that are down to the
 	 * same dose as each other.
 	 */
@@ -68,10 +79,32 @@ public interface PotionBoostConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "skills",
+		name = "Skills",
+		description = "Whether what is listed below is what to show or what to hide",
+		position = 3
+	)
+	default Skills skills()
+	{
+		return Skills.EVERYTHING;
+	}
+
+	@ConfigItem(
+		keyName = "skillList",
+		name = "Listed skills",
+		description = "Separated by commas, and read in place of combat only",
+		position = 4
+	)
+	default String skillList()
+	{
+		return "";
+	}
+
+	@ConfigItem(
 		keyName = "drains",
 		name = "Show drains",
 		description = "Show what a potion takes away as well as what it gives",
-		position = 3
+		position = 5
 	)
 	default boolean drains()
 	{
@@ -82,19 +115,19 @@ public interface PotionBoostConfig extends Config
 		keyName = "food",
 		name = "Include food",
 		description = "Label what only heals or restores too, not only what boosts",
-		position = 4
+		position = 6
 	)
 	default boolean food()
 	{
 		return false;
 	}
 
-	@Range(min = 1, max = 20)
+	@Range(max = 20)
 	@ConfigItem(
 		keyName = "minimum",
 		name = "Minimum",
-		description = "Leave out a skill that would move by less than this",
-		position = 5
+		description = "Leave out a skill that would move by less than this, or nothing to keep them all",
+		position = 7
 	)
 	default int minimum()
 	{
@@ -106,7 +139,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "transparency",
 		name = "Transparency",
 		description = "How far to see the potion through what is drawn over it",
-		position = 6
+		position = 8
 	)
 	default int transparency()
 	{
@@ -117,7 +150,7 @@ public interface PotionBoostConfig extends Config
 		keyName = "prioritize",
 		name = "Prioritize",
 		description = "Which one it goes on when several are down to the same dose",
-		position = 7
+		position = 9
 	)
 	default Prioritize prioritize()
 	{

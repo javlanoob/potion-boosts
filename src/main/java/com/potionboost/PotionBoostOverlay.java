@@ -11,8 +11,10 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -123,6 +125,14 @@ class PotionBoostOverlay extends Overlay
 	private final Map<Integer, Item> items = new HashMap<>();
 
 	private int itemsTick = -1;
+
+	/**
+	 * The skills named in the setting, and the setting they were read out of, so that taking a list apart
+	 * happens when it is written rather than for every row of every frame.
+	 */
+	private Set<String> listed = Set.of();
+
+	private String listedFrom = null;
 
 	@Inject
 	PotionBoostOverlay(
@@ -250,8 +260,8 @@ class PotionBoostOverlay extends Overlay
 	/**
 	 * What drinking an item now would do to the skills it touches, asked of the game rather than kept
 	 * here as a list of potions, so the mixes, the divines and the brews are read the same way a plain
-	 * super strength is. A skill it would leave where it already is drops out, which is what takes a
-	 * boost off a slot once the boost is on.
+	 * super strength is. Whether a skill it would leave where it already is has a row of its own is for
+	 * the settings to say, so they are all kept here.
 	 *
 	 * <p>Whether it is a potion at all is worked out here as well, from what it touches rather than from
 	 * how far it moves it. Food heals your hitpoints and does nothing else but put your run back, so a
@@ -293,7 +303,7 @@ class PotionBoostOverlay extends Overlay
 			heals |= stat == Stats.HITPOINTS;
 			skills |= stat != Stats.HITPOINTS && stat != Stats.RUN_ENERGY;
 
-			if (change.getRelative() != 0 && SkillIcons.of(stat) != SkillIcons.NONE)
+			if (SkillIcons.of(stat) != SkillIcons.NONE)
 			{
 				changed.add(change);
 			}
@@ -303,24 +313,79 @@ class PotionBoostOverlay extends Overlay
 	}
 
 	/**
-	 * The rows left once the settings have had the skills you do not fight with out of them, the ones a
+	 * The rows left once the settings have had the skills you do not care about out of them, the ones a
 	 * potion takes away rather than gives, and the ones it would hardly move.
+	 *
+	 * <p>A minimum of nothing keeps the skills a potion would not move at all, which is the last of the
+	 * colours Item Stats has a setting for: a row with nothing left to gain reads in the no change
+	 * colour rather than going away.
 	 */
 	private List<StatChange> shown(List<StatChange> changed)
 	{
 		List<StatChange> shown = new ArrayList<>(changed.size());
+		int minimum = config.minimum();
 
 		for (StatChange change : changed)
 		{
-			if ((change.getRelative() > 0 || config.drains())
-				&& Math.abs(change.getRelative()) >= config.minimum()
-				&& (!config.combatOnly() || FIGHTING.contains(change.getStat())))
+			if ((change.getRelative() >= 0 || config.drains())
+				&& Math.abs(change.getRelative()) >= minimum
+				&& wanted(change.getStat()))
 			{
 				shown.add(change);
 			}
 		}
 
 		return shown;
+	}
+
+	/**
+	 * Whether a skill is one you asked to see. The list you write out takes the place of the combat
+	 * setting rather than being read on top of it, since the two together would leave you writing out a
+	 * skill and still not being shown it.
+	 */
+	private boolean wanted(Stat stat)
+	{
+		switch (config.skills())
+		{
+			case ONLY_THESE:
+				return listed(stat);
+			case ALL_BUT_THESE:
+				return !listed(stat);
+			default:
+				return !config.combatOnly() || FIGHTING.contains(stat);
+		}
+	}
+
+	/**
+	 * Whether a skill was named in the list, taken apart as it was last written rather than for every row
+	 * of every frame. Spaces and capitals are ignored, so a run energy is found however it was typed.
+	 */
+	private boolean listed(Stat stat)
+	{
+		String written = config.skillList();
+
+		if (!written.equals(listedFrom))
+		{
+			listedFrom = written;
+			listed = new HashSet<>();
+
+			for (String name : written.split(","))
+			{
+				String trimmed = flattened(name);
+
+				if (!trimmed.isEmpty())
+				{
+					listed.add(trimmed);
+				}
+			}
+		}
+
+		return listed.contains(flattened(stat.getName()));
+	}
+
+	private static String flattened(String name)
+	{
+		return name.replace(" ", "").toLowerCase(Locale.ROOT);
 	}
 
 	/**
