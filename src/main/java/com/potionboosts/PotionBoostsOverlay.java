@@ -365,20 +365,22 @@ class PotionBoostsOverlay extends Overlay
 	 * Whether a skill is one you asked to see. Writing out the skills to show takes the place of the
 	 * combat setting rather than being read on top of it, since the two together would leave you writing
 	 * out a skill and still not being shown it. The skills to leave out are read after either of them, so
-	 * a skill written into both lists is left out.
+	 * a skill written into both lists is left out, and a list that names nothing is no list at all.
 	 */
 	private boolean wanted(Stat stat)
 	{
-		if (hiding.has(config.hiddenSkills(), stat))
+		String name = flattened(stat.getName());
+
+		if (hiding.of(config.hiddenSkills()).contains(name))
 		{
 			return false;
 		}
 
-		String written = config.shownSkills();
+		Set<String> shown = showing.of(config.shownSkills());
 
-		if (!written.trim().isEmpty())
+		if (!shown.isEmpty())
 		{
-			return showing.has(written, stat);
+			return shown.contains(name);
 		}
 
 		return !config.combatOnly() || FIGHTING.contains(stat);
@@ -394,7 +396,7 @@ class PotionBoostsOverlay extends Overlay
 
 		private String from = null;
 
-		private boolean has(String written, Stat stat)
+		private Set<String> of(String written)
 		{
 			if (!written.equals(from))
 			{
@@ -412,7 +414,7 @@ class PotionBoostsOverlay extends Overlay
 				}
 			}
 
-			return names.contains(flattened(stat.getName()));
+			return names;
 		}
 	}
 
