@@ -118,13 +118,26 @@ class PotionBoostsOverlay extends Overlay
 	private final Map<Integer, BufferedImage> icons = new HashMap<>();
 
 	/**
-	 * What each item in the inventory would change, and the tick that was worked out on. The answer
-	 * depends on the levels you are at, so it is thrown away once a tick rather than kept, and worked
-	 * out once a tick rather than once a frame.
+	 * What each item in the inventory would show, and the tick that was worked out on. The answer depends
+	 * on the levels you are at and on the settings, so it is thrown away on a tick or a setting rather
+	 * than worked out again for every slot of every frame.
 	 */
 	private final Map<Integer, Item> items = new HashMap<>();
 
 	private int itemsTick = -1;
+
+	/**
+	 * Whether a setting has changed since the rows were worked out. Set rather than cleared on the spot,
+	 * because the settings are changed from the side of the client that draws the panel rather than the
+	 * side that draws the game, and the clearing belongs where the reading is.
+	 */
+	private volatile boolean stale;
+
+	/**
+	 * The name of an item with the doses taken off the end of it, and the doses that were taken off, which
+	 * is the same answer for as long as the client is open.
+	 */
+	private final Map<Integer, Named> names = new HashMap<>();
 
 	/** The skills to show, out of the setting they were written in. */
 	private final Listing showing = new Listing();
@@ -158,6 +171,15 @@ class PotionBoostsOverlay extends Overlay
 		this.spriteManager = spriteManager;
 		this.colours = configManager.getConfig(ItemStatConfig.class);
 		this.config = config;
+	}
+
+	/**
+	 * Marked for working out again when a setting changes, since what is kept is the rows the settings had
+	 * left rather than everything the item would do.
+	 */
+	void reset()
+	{
+		stale = true;
 	}
 
 	@Override
@@ -228,10 +250,11 @@ class PotionBoostsOverlay extends Overlay
 	{
 		List<Potion> potions = new ArrayList<>();
 
-		if (itemsTick != client.getTickCount())
+		if (stale || itemsTick != client.getTickCount())
 		{
 			items.clear();
 			itemsTick = client.getTickCount();
+			stale = false;
 		}
 
 		for (int slot = 0; slot < SLOTS; slot++)
@@ -244,11 +267,10 @@ class PotionBoostsOverlay extends Overlay
 			}
 
 			Item item = items.computeIfAbsent(child.getItemId(), this::itemOf);
-			List<StatChange> shown = shown(item.changes);
 
-			if (!shown.isEmpty())
+			if (!item.rows.isEmpty())
 			{
-				potions.add(new Potion(child.getBounds(), shown, child.getItemId(), slot, item.potion));
+				potions.add(new Potion(child.getBounds(), item.rows, child.getItemId(), slot, item.potion));
 			}
 		}
 
@@ -285,7 +307,7 @@ class PotionBoostsOverlay extends Overlay
 			return Item.NOTHING;
 		}
 
-		List<StatChange> changed = new ArrayList<>();
+		List<StatChange> changed = new ArrayList<>(stats.getStatChanges().length);
 		boolean heals = false;
 		boolean skills = false;
 
@@ -307,7 +329,7 @@ class PotionBoostsOverlay extends Overlay
 			}
 		}
 
-		return new Item(changed, skills || !heals);
+		return new Item(shown(changed), skills || !heals);
 	}
 
 	/**
@@ -420,24 +442,35 @@ class PotionBoostsOverlay extends Overlay
 				continue;
 			}
 
-			String name = itemManager.getItemComposition(potion.item).getName();
-			Matcher dose = DOSE.matcher(name);
-			boolean dosed = dose.find();
+			Named named = names.computeIfAbsent(potion.item, this::nameOf);
 
-			potion.dose = dosed ? Integer.parseInt(dose.group(1)) : 0;
+			potion.dose = named.dose;
 
-			String key = dosed ? name.substring(0, dose.start()) : name;
-			Potion held = kept.get(key);
+			Potion held = kept.get(named.name);
 
 			if (held == null
 				|| potion.dose < held.dose
 				|| potion.dose == held.dose && corner(potion.slot) < corner(held.slot))
 			{
-				kept.put(key, potion);
+				kept.put(named.name, potion);
 			}
 		}
 
 		return new ArrayList<>(kept.values());
+	}
+
+	/**
+	 * An item name with the doses taken off the end of it, so that the four doses of a super strength are
+	 * the one potion, and the doses themselves, which say which of them is nearest gone.
+	 */
+	private Named nameOf(int item)
+	{
+		String name = itemManager.getItemComposition(item).getName();
+		Matcher dose = DOSE.matcher(name);
+
+		return dose.find()
+			? new Named(name.substring(0, dose.start()), Integer.parseInt(dose.group(1)))
+			: new Named(name, 0);
 	}
 
 	/**
@@ -618,24 +651,37 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * What an item in the inventory would do, worked out once for the tick rather than once for each of
+	 * What an item in the inventory would show, worked out once for the tick rather than once for each of
 	 * the slots holding one.
 	 */
 	private static class Item
 	{
 		private static final Item NOTHING = new Item(List.of(), false);
 
-		private final List<StatChange> changes;
+		private final List<StatChange> rows;
 
 		/**
 		 * Whether it moves a skill rather than only healing you, which is what tells a potion from food.
 		 */
 		private final boolean potion;
 
-		private Item(List<StatChange> changes, boolean potion)
+		private Item(List<StatChange> rows, boolean potion)
 		{
-			this.changes = changes;
+			this.rows = rows;
 			this.potion = potion;
+		}
+	}
+
+	/** An item name without its doses, and the doses it was holding. */
+	private static class Named
+	{
+		private final String name;
+		private final int dose;
+
+		private Named(String name, int dose)
+		{
+			this.name = name;
+			this.dose = dose;
 		}
 	}
 

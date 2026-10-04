@@ -3,6 +3,8 @@ package com.potionboosts;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -36,5 +38,18 @@ public class PotionBoostsPlugin extends Plugin
 	protected void shutDown()
 	{
 		overlayManager.remove(overlay);
+	}
+
+	/**
+	 * What the overlay keeps from one tick to the next is what the settings had left of an item, so a
+	 * setting changing has to throw that away rather than wait for the tick to do it.
+	 */
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (PotionBoostsConfig.GROUP.equals(event.getGroup()))
+		{
+			overlay.reset();
+		}
 	}
 }
