@@ -1,7 +1,7 @@
 # Potion Boosts
 Draws the skill icons a potion in your inventory would move over the potion itself, each with how much it would give, or the level it would take you to.
 
-- Every item and every skill the Item Stats plugin knows about is labelled, run energy included, and the numbers are coloured the way that plugin colours its own, in the colours you have set there: green for a boost you would get all of, yellow for one that would partly go to waste, white for one with nothing left to gain, red for what a potion takes away.
+- Every item and every skill the Item Stats plugin knows about is labelled, run energy included, and the numbers are coloured the way that plugin colours its own, in the colours you have set there: green for a boost you would get all of, the paler green Item Stats has and never uses for one most of which you would get, yellow for one that would nearly all go to waste, red for what a potion takes away.
 - Only potions are labelled. Food heals you and does nothing else but put your run back, so a guthix rest is food for all that it carries doses in its name, and food can be turned on separately.
 - Only the combat skills are labelled until you ask for the rest. There is a list for the skills to show, which is read in place of that, and a list for the skills to hide, which is read after it either way.
 - What a potion drains is left out until you ask for that, a skill with nothing left to gain is left out until you ask for that, and a skill that would hardly move can be left out by setting a minimum.

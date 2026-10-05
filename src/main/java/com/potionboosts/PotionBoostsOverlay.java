@@ -593,11 +593,29 @@ class PotionBoostsOverlay extends Overlay
 
 			graphics.setColor(Color.BLACK);
 			graphics.drawString(label, x + 1, baseline + 1);
-			graphics.setColor(Positivity.getColor(colours, change.getPositivity()));
+			graphics.setColor(colour(change));
 			graphics.drawString(label, x, baseline);
 
 			y += height;
 		}
+	}
+
+	/**
+	 * The colour Item Stats would give a row, except that a boost most of which you would get is told
+	 * apart from one you would hardly get any of. Item Stats has a colour between its best and its worst
+	 * that it never puts to use, since anything at all held back by your level is the one colour there, so
+	 * all three are put to use here: all of the boost, most of it, little of it.
+	 */
+	private Color colour(StatChange change)
+	{
+		Positivity positivity = change.getPositivity();
+
+		if (positivity == Positivity.BETTER_CAPPED && change.getRelative() * 2 >= change.getTheoretical())
+		{
+			positivity = Positivity.BETTER_SOMECAPPED;
+		}
+
+		return Positivity.getColor(colours, positivity);
 	}
 
 	/**
