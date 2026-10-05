@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarbitID;
@@ -98,11 +99,18 @@ class PotionBoostsOverlay extends Overlay
 	private static final int CROWDED = 3;
 
 	/**
-	 * The colosseum invocation that lets nothing heal you past your hitpoints, held as how many of it you
-	 * took. A brew is worked out as being able to carry you a tenth over your level, which is what it does
-	 * anywhere else, so with this one on it was promising hitpoints a brew would not give.
+	 * The colosseum invocation that takes some of your hitpoints away and lets nothing heal you past what
+	 * is left, held as how many tiers of it you took. Everything outside the colosseum works your hitpoints
+	 * out from your level, so in there both halves of it were being promised: a brew carrying you over your
+	 * level, and food carrying you to a level the invocation has taken off you.
 	 */
 	private static final int FRAILTY = VarbitID.COLOSSEUM_MODIFIER_FRAILTY_STACKS_CLIENT;
+
+	/**
+	 * How much of your hitpoints each tier of that invocation takes, in tenths: a tenth, a fifth, then two
+	 * fifths. The tiers are what it leaves you with rather than one on top of the next.
+	 */
+	private static final int[] FRAIL = {0, 1, 2, 4};
 
 	/**
 	 * How far an item has to be taken before the game is carrying it rather than letting it sit where it
@@ -417,7 +425,7 @@ class PotionBoostsOverlay extends Overlay
 			heals |= stat == Stats.HITPOINTS;
 			skills |= stat != Stats.HITPOINTS && stat != Stats.RUN_ENERGY;
 
-			if (stat == Stats.HITPOINTS && client.getVarbitValue(FRAILTY) > 0)
+			if (stat == Stats.HITPOINTS)
 			{
 				unhealed(change);
 			}
@@ -432,24 +440,48 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * Takes the overheal out of a hitpoints row, for the invocation that allows none. What a brew would
-	 * have given is left as it was, so the row still reads as a boost going to waste rather than as a boost
-	 * you would get all of, and a bar that is already full reads as nothing to gain.
+	 * A hitpoints row cut back to the hitpoints you have, for the invocation that takes some of them away
+	 * and lets nothing heal you past the rest. What the item would have given is left as it was, which is
+	 * what the colour is worked out against, so the row reads as a boost going to waste rather than as one
+	 * you would get all of, and a bar already as full as it will go reads as nothing to gain.
 	 */
 	private void unhealed(StatChange change)
 	{
-		int max = client.getRealSkillLevel(Skill.HITPOINTS);
+		int tier = client.getVarbitValue(FRAILTY);
 
-		if (change.getAbsolute() <= max)
+		if (tier <= 0)
 		{
 			return;
 		}
 
-		int relative = Math.max(0, max - client.getBoostedSkillLevel(Skill.HITPOINTS));
+		int ceiling = hitpoints(tier);
+
+		if (change.getAbsolute() <= ceiling)
+		{
+			return;
+		}
+
+		int relative = Math.max(0, ceiling - client.getBoostedSkillLevel(Skill.HITPOINTS));
 
 		change.setAbsolute(change.getAbsolute() - change.getRelative() + relative);
 		change.setRelative(relative);
 		change.setPositivity(relative > 0 ? Positivity.BETTER_CAPPED : Positivity.NO_CHANGE);
+	}
+
+	/**
+	 * The hitpoints the invocation leaves you to be healed to, out of the tiers of it you took. What it
+	 * leaves is worked out from the level your experience comes to rather than from the
+	 * level the game reports, so that taking a tenth off a level the game has already taken a tenth off
+	 * does not take a fifth, whichever of the two the game turns out to do.
+	 */
+	private int hitpoints(int tier)
+	{
+		int max = client.getRealSkillLevel(Skill.HITPOINTS);
+		int taken = FRAIL[Math.min(tier, FRAIL.length - 1)];
+		int level = Math.min(Experience.MAX_REAL_LEVEL,
+			Experience.getLevelForXp(client.getSkillExperience(Skill.HITPOINTS)));
+
+		return Math.min(max, level - level * taken / 10);
 	}
 
 	/**
