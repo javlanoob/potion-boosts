@@ -89,10 +89,24 @@ class PotionBoostsOverlay extends Overlay
 	private static final int MIN_ICON = 6;
 
 	/**
+	 * How many rows a slot holds one under the other before they go up two abreast instead. Four rows
+	 * fit, but only at the size the icons stop being drawn any smaller, and two by two is the same four
+	 * rows with the icons half as big again.
+	 */
+	private static final int CROWDED = 3;
+
+	/**
 	 * How far an item has to be taken before the game is carrying it rather than letting it sit where it
 	 * is, so that a click on a potion is a click and not a drag of five pixels.
 	 */
 	private static final int CARRIED = 5;
+
+	/**
+	 * The room between one slot and the next, which a row two abreast is allowed to run into. A slot is
+	 * thirty six wide and they are forty two apart, and a number in the small font is eleven wide without
+	 * its sign, so the pair of them only go side by side with the gap thrown in.
+	 */
+	private static final int GUTTER = 6;
 
 	/**
 	 * How light a pixel has to be to want an outline pixel of its own next to it. The skill icons are
@@ -562,22 +576,59 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * A row for each skill, stacked down the middle of the slot with the icon on the left of its number.
-	 * The number is in the colour Item Stats would have given it, so a boost that would go to waste
-	 * reads as one at a glance.
+	 * A row for each skill, down the middle of the slot with the icon on the left of its number. The
+	 * number is in the colour Item Stats would have given it, so a boost that would go to waste reads as
+	 * one at a glance.
+	 *
+	 * <p>Past a few skills the rows go up two abreast, since a slot is wide enough for two of them and a
+	 * brew moving six skills down one column leaves each row too short to read. They read across before
+	 * they read down, the way a list does.
 	 */
 	private void draw(Graphics2D graphics, FontMetrics metrics, Potion potion)
 	{
 		Rectangle bounds = potion.bounds;
-		int rows = potion.changes.size();
-		int height = Math.min(MAX_ROW, bounds.height / rows);
-		int iconHeight = Math.max(MIN_ICON, height - 2);
-		int y = bounds.y + (bounds.height - rows * height) / 2;
+		int count = potion.changes.size();
 
-		for (StatChange change : potion.changes)
+		int columns = count > CROWDED ? 2 : 1;
+		int rows = (count + columns - 1) / columns;
+		int width = columns == 1 ? bounds.width : (bounds.width + GUTTER) / columns;
+		int room = Math.min(MAX_ROW, bounds.height / rows);
+		String[] labels = new String[count];
+		int widest = 0;
+
+		for (int at = 0; at < count; at++)
 		{
-			BufferedImage icon = icon(SkillIcons.of(change.getStat()), iconHeight);
-			int x = bounds.x;
+			labels[at] = label(potion.changes.get(at), columns);
+			widest = Math.max(widest, metrics.stringWidth(labels[at]));
+		}
+
+		// Whichever is the less of the room a row has and the room left beside the longest number
+		int iconHeight = Math.max(MIN_ICON, Math.min(room - 2, width - widest));
+
+		// A row takes all the room it is given rather than only what its icon needs, so that two skills
+		// side by side are read as a square of four and not as two lines of numbers
+		int height = room;
+		int top = bounds.y + (bounds.height - rows * height) / 2;
+		BufferedImage[] marks = new BufferedImage[count];
+		int[] reach = new int[columns];
+
+		for (int at = 0; at < count; at++)
+		{
+			marks[at] = icon(SkillIcons.of(potion.changes.get(at).getStat()), iconHeight);
+			reach[at % columns] = Math.max(reach[at % columns],
+				(marks[at] == null ? 0 : marks[at].getWidth()) + metrics.stringWidth(labels[at]));
+		}
+
+		// The second column begins where the first one ends rather than halfway along the slot, so that a
+		// column of numbers narrower than the widest of them is not held apart from the one beside it. It
+		// gives way when that would carry it past the gap to the next slot.
+		int beside = Math.min(reach[0], bounds.width + GUTTER - reach[columns - 1]);
+
+		for (int at = 0; at < count; at++)
+		{
+			BufferedImage icon = marks[at];
+			int x = bounds.x + at % columns * beside;
+			int y = top + at / columns * height;
 
 			if (icon != null)
 			{
@@ -585,18 +636,12 @@ class PotionBoostsOverlay extends Overlay
 				x += icon.getWidth();
 			}
 
-			String label = config.number() == PotionBoostsConfig.Number.LEVEL
-				? Integer.toString(change.getAbsolute())
-				: change.getFormattedRelative();
-
 			int baseline = y + (height + metrics.getAscent()) / 2 - 1;
 
 			graphics.setColor(Color.BLACK);
-			graphics.drawString(label, x + 1, baseline + 1);
-			graphics.setColor(colour(change));
-			graphics.drawString(label, x, baseline);
-
-			y += height;
+			graphics.drawString(labels[at], x + 1, baseline + 1);
+			graphics.setColor(colour(potion.changes.get(at)));
+			graphics.drawString(labels[at], x, baseline);
 		}
 	}
 
@@ -616,6 +661,23 @@ class PotionBoostsOverlay extends Overlay
 		}
 
 		return Positivity.getColor(colours, positivity);
+	}
+
+	/**
+	 * How much it would give, or the level it would take you to, which is the setting. Side by side there
+	 * is no room for the plus in front of a boost, which is seven of the twenty one pixels a column has, and
+	 * nothing is lost by it: what it was saying is said again by the colour, and a drain keeps its minus.
+	 */
+	private String label(StatChange change, int columns)
+	{
+		if (config.number() == PotionBoostsConfig.Number.LEVEL)
+		{
+			return Integer.toString(change.getAbsolute());
+		}
+
+		String relative = change.getFormattedRelative();
+
+		return columns > 1 && relative.startsWith("+") ? relative.substring(1) : relative;
 	}
 
 	/**
