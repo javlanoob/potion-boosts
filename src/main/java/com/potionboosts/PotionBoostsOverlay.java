@@ -22,7 +22,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.Skill;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
@@ -94,6 +96,13 @@ class PotionBoostsOverlay extends Overlay
 	 * rows with the icons half as big again.
 	 */
 	private static final int CROWDED = 3;
+
+	/**
+	 * The colosseum invocation that lets nothing heal you past your hitpoints, held as how many of it you
+	 * took. A brew is worked out as being able to carry you a tenth over your level, which is what it does
+	 * anywhere else, so with this one on it was promising hitpoints a brew would not give.
+	 */
+	private static final int FRAILTY = VarbitID.COLOSSEUM_MODIFIER_FRAILTY_STACKS_CLIENT;
 
 	/**
 	 * How far an item has to be taken before the game is carrying it rather than letting it sit where it
@@ -408,6 +417,11 @@ class PotionBoostsOverlay extends Overlay
 			heals |= stat == Stats.HITPOINTS;
 			skills |= stat != Stats.HITPOINTS && stat != Stats.RUN_ENERGY;
 
+			if (stat == Stats.HITPOINTS && client.getVarbitValue(FRAILTY) > 0)
+			{
+				unhealed(change);
+			}
+
 			if (SkillIcons.of(stat) != SkillIcons.NONE)
 			{
 				changed.add(change);
@@ -415,6 +429,27 @@ class PotionBoostsOverlay extends Overlay
 		}
 
 		return new Item(shown(changed), skills || !heals);
+	}
+
+	/**
+	 * Takes the overheal out of a hitpoints row, for the invocation that allows none. What a brew would
+	 * have given is left as it was, so the row still reads as a boost going to waste rather than as a boost
+	 * you would get all of, and a bar that is already full reads as nothing to gain.
+	 */
+	private void unhealed(StatChange change)
+	{
+		int max = client.getRealSkillLevel(Skill.HITPOINTS);
+
+		if (change.getAbsolute() <= max)
+		{
+			return;
+		}
+
+		int relative = Math.max(0, max - client.getBoostedSkillLevel(Skill.HITPOINTS));
+
+		change.setAbsolute(change.getAbsolute() - change.getRelative() + relative);
+		change.setRelative(relative);
+		change.setPositivity(relative > 0 ? Positivity.BETTER_CAPPED : Positivity.NO_CHANGE);
 	}
 
 	/**
