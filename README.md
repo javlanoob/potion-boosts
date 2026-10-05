@@ -6,4 +6,5 @@ Draws the skill icons a potion in your inventory would move over the potion itse
 - Only the combat skills are labelled until you ask for the rest. There is a list for the skills to show, which is read in place of that, and a list for the skills to hide, which is read after it either way.
 - What a potion drains is left out until you ask for that, a skill with nothing left to gain is left out until you ask for that, and a skill that would hardly move can be left out by setting a minimum.
 - Carrying several of the same potion labels the one with the least left in it, which is the one worth drinking first. When two are down to the same dose it is the one nearest whichever corner of your inventory you pick. Different potions are labelled separately, so a super combat and a ranging potion both get their own.
+- Dragging a potion carries its numbers with it, and they stop at the edge of your inventory where the potion does.
 - It can be made as see-through as you like, and it is drawn under the other things that label a slot, so a dose count in the corner stays readable.

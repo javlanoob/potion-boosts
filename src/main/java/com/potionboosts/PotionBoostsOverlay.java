@@ -7,6 +7,7 @@ import java.awt.Composite;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -88,6 +89,12 @@ class PotionBoostsOverlay extends Overlay
 	private static final int MIN_ICON = 6;
 
 	/**
+	 * How far an item has to be taken before the game is carrying it rather than letting it sit where it
+	 * is, so that a click on a potion is a click and not a drag of five pixels.
+	 */
+	private static final int CARRIED = 5;
+
+	/**
 	 * How light a pixel has to be to want an outline pixel of its own next to it. The skill icons are
 	 * drawn with a dark edge already, and going around that as well is what reads as two pixels thick.
 	 */
@@ -138,6 +145,12 @@ class PotionBoostsOverlay extends Overlay
 	 * is the same answer for as long as the client is open.
 	 */
 	private final Map<Integer, Named> names = new HashMap<>();
+
+	/** Where the mouse took hold of an item, or nothing when it has hold of nothing. */
+	private Point grabbed;
+
+	/** Whether what it has hold of has been taken far enough for the game to be carrying it. */
+	private boolean carrying;
 
 	/** The skills to show, out of the setting they were written in. */
 	private final Listing showing = new Listing();
@@ -257,6 +270,9 @@ class PotionBoostsOverlay extends Overlay
 			stale = false;
 		}
 
+		Widget dragged = client.getDraggedWidget();
+		Point carried = carried(dragged);
+
 		for (int slot = 0; slot < SLOTS; slot++)
 		{
 			Widget child = container.getChild(slot);
@@ -268,13 +284,68 @@ class PotionBoostsOverlay extends Overlay
 
 			Item item = items.computeIfAbsent(child.getItemId(), this::itemOf);
 
-			if (!item.rows.isEmpty())
+			if (item.rows.isEmpty())
 			{
-				potions.add(new Potion(child.getBounds(), item.rows, child.getItemId(), slot, item.potion));
+				continue;
 			}
+
+			Rectangle bounds = child.getBounds();
+
+			if (child == dragged && carried != null)
+			{
+				bounds.translate(carried.x, carried.y);
+				within(bounds, container.getBounds());
+			}
+
+			potions.add(new Potion(bounds, item.rows, child.getItemId(), slot, item.potion));
 		}
 
 		return potions;
+	}
+
+	/** Moves a rectangle back inside another one, as far as it has to go and no further. */
+	private static void within(Rectangle bounds, Rectangle room)
+	{
+		bounds.x = Math.min(Math.max(bounds.x, room.x), room.x + room.width - bounds.width);
+		bounds.y = Math.min(Math.max(bounds.y, room.y), room.y + room.height - bounds.height);
+	}
+
+	/**
+	 * How far the item the mouse has hold of has been carried from the slot it belongs to, or nothing
+	 * when nothing is being carried. A slot keeps its item until the mouse has held it for a moment and
+	 * taken it somewhere, so the rows wait for the same before they go anywhere, and once they have gone
+	 * they stay with the mouse however near it comes back to where it started.
+	 */
+	private Point carried(Widget dragged)
+	{
+		if (dragged == null)
+		{
+			grabbed = null;
+			carrying = false;
+			return null;
+		}
+
+		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+
+		if (grabbed == null)
+		{
+			grabbed = new Point(mouse.getX(), mouse.getY());
+		}
+
+		Point carried = new Point(mouse.getX() - grabbed.x, mouse.getY() - grabbed.y);
+
+		if (!carrying)
+		{
+			if (client.getDragTime() <= dragged.getDragDeadTime()
+				|| carried.distanceSq(0, 0) < CARRIED * CARRIED)
+			{
+				return null;
+			}
+
+			carrying = true;
+		}
+
+		return carried;
 	}
 
 	/**
