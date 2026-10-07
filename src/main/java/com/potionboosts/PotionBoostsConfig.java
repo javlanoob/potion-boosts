@@ -158,4 +158,15 @@ public interface PotionBoostsConfig extends Config
 	{
 		return "";
 	}
+
+	@ConfigItem(
+		keyName = "tripleEat",
+		name = "Triple eat",
+		description = "Mark the food, karambwan and brew to eat together once none of it would go to waste",
+		position = 11
+	)
+	default boolean tripleEat()
+	{
+		return false;
+	}
 }

@@ -25,6 +25,7 @@ import net.runelite.api.Client;
 import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
@@ -75,6 +76,15 @@ class PotionBoostsOverlay extends Overlay
 		Stats.HITPOINTS,
 		Stats.PRAYER,
 		Stats.RUN_ENERGY);
+
+	/**
+	 * The cooked karambwans, which are the one food that goes down on top of another rather than in place
+	 * of it, and so the one the three eaten together is built around.
+	 */
+	private static final Set<Integer> KARAMBWAN = ImmutableSet.of(
+		ItemID.TBWT_COOKED_KARAMBWAN,
+		ItemID.BR_TBWT_COOKED_KARAMBWAN,
+		ItemID.BLIGHTED_KARAMBWAN);
 
 	/**
 	 * The doses a potion has left, which is the end of its name and the only thing telling two of the
@@ -236,7 +246,9 @@ class PotionBoostsOverlay extends Overlay
 			return null;
 		}
 
-		List<Potion> potions = potionsIn(container);
+		refresh();
+
+		List<Potion> potions = potionsIn(container, triple(container));
 
 		if (potions.isEmpty())
 		{
@@ -287,20 +299,134 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * Every slot holding something there is a row to put on, in the order the slots are filled, which
-	 * reads left to right from the top.
+	 * Throws away what was worked out for the last tick, so that the slots are read against the levels and
+	 * the settings as they are now.
 	 */
-	private List<Potion> potionsIn(Widget container)
+	private void refresh()
 	{
-		List<Potion> potions = new ArrayList<>();
-
 		if (stale || itemsTick != client.getTickCount())
 		{
 			items.clear();
 			itemsTick = client.getTickCount();
 			stale = false;
 		}
+	}
 
+	/**
+	 * The three to eat together, by name, or nothing at all when there is no such three to be had. A
+	 * karambwan goes down on top of a bite of food and a drink goes down on top of both, so the three of
+	 * them heal you in the one tick where three bites of food would take three of them.
+	 *
+	 * <p>It is only worth saying so while all three of them would heal you, so the three are chosen
+	 * against the hitpoints you are missing rather than named in a list: the drink and the food that
+	 * between them heal the most of what is missing without carrying you over it. A cake is therefore
+	 * marked sooner than a shark is, since less of you has to be missing for a cake to fit, and nothing is
+	 * marked at all until the smallest three you are holding would fit.
+	 *
+	 * <p>What counts as a drink is whatever carries doses in its name, which tells a guthix rest from a
+	 * cake without a list of either, and takes a brew for the drink it is rather than for the defence it
+	 * puts on.
+	 */
+	private Set<String> triple(Widget container)
+	{
+		if (!config.tripleEat())
+		{
+			return Set.of();
+		}
+
+		int room = headroom();
+
+		if (room <= 0)
+		{
+			return Set.of();
+		}
+
+		String karambwan = null;
+		int bwan = 0;
+		Map<String, Integer> drinks = new LinkedHashMap<>();
+		Map<String, Integer> bites = new LinkedHashMap<>();
+
+		for (int slot = 0; slot < SLOTS; slot++)
+		{
+			Widget child = container.getChild(slot);
+
+			if (child == null || child.getItemId() <= 0)
+			{
+				continue;
+			}
+
+			int id = child.getItemId();
+			Item item = items.computeIfAbsent(id, this::itemOf);
+
+			if (item.heal <= 0)
+			{
+				continue;
+			}
+
+			Named named = names.computeIfAbsent(id, this::nameOf);
+
+			if (KARAMBWAN.contains(id))
+			{
+				karambwan = named.name;
+				bwan = item.heal;
+			}
+			else if (named.dose > 0)
+			{
+				drinks.merge(named.name, item.heal, Math::max);
+			}
+			else
+			{
+				bites.merge(named.name, item.heal, Math::max);
+			}
+		}
+
+		if (karambwan == null)
+		{
+			return Set.of();
+		}
+
+		String drink = null;
+		String bite = null;
+		int most = 0;
+
+		for (Map.Entry<String, Integer> held : drinks.entrySet())
+		{
+			for (Map.Entry<String, Integer> food : bites.entrySet())
+			{
+				int healed = bwan + held.getValue() + food.getValue();
+
+				if (healed <= room && healed > most)
+				{
+					most = healed;
+					drink = held.getKey();
+					bite = food.getKey();
+				}
+			}
+		}
+
+		return drink == null ? Set.of() : ImmutableSet.of(karambwan, drink, bite);
+	}
+
+	/**
+	 * The hitpoints you are missing, which is the room there is to be healed. The invocation that lets
+	 * nothing heal you past what it leaves is read here as well, so that in there the three are chosen
+	 * against the hitpoints you can actually have back.
+	 */
+	private int headroom()
+	{
+		int tier = client.getVarbitValue(FRAILTY);
+		int ceiling = tier > 0 ? hitpoints(tier) : client.getRealSkillLevel(Skill.HITPOINTS);
+
+		return ceiling - client.getBoostedSkillLevel(Skill.HITPOINTS);
+	}
+
+	/**
+	 * Every slot holding something there is a row to put on, in the order the slots are filled, which
+	 * reads left to right from the top.
+	 */
+	private List<Potion> potionsIn(Widget container, Set<String> triple)
+	{
+		List<Potion> potions = new ArrayList<>();
 		Widget dragged = client.getDraggedWidget();
 		Point carried = carried(dragged);
 
@@ -315,7 +441,12 @@ class PotionBoostsOverlay extends Overlay
 
 			Item item = items.computeIfAbsent(child.getItemId(), this::itemOf);
 
-			if (item.rows.isEmpty())
+			// One of the three eaten together is marked whether it has a row to its name or not, since the
+			// mark is the whole of what it is there to say
+			boolean combo = !triple.isEmpty()
+				&& triple.contains(names.computeIfAbsent(child.getItemId(), this::nameOf).name);
+
+			if (item.rows.isEmpty() && !combo)
 			{
 				continue;
 			}
@@ -328,7 +459,7 @@ class PotionBoostsOverlay extends Overlay
 				within(bounds, container.getBounds());
 			}
 
-			potions.add(new Potion(bounds, item.rows, child.getItemId(), slot, item.potion));
+			potions.add(new Potion(bounds, item.rows, child.getItemId(), slot, item.potion, combo));
 		}
 
 		return potions;
@@ -412,6 +543,7 @@ class PotionBoostsOverlay extends Overlay
 		List<StatChange> changed = new ArrayList<>(stats.getStatChanges().length);
 		boolean heals = false;
 		boolean skills = false;
+		int heal = 0;
 
 		for (StatChange change : stats.getStatChanges())
 		{
@@ -427,6 +559,9 @@ class PotionBoostsOverlay extends Overlay
 
 			if (stat == Stats.HITPOINTS)
 			{
+				// What it would heal rather than what it is about to, since three of them are added up
+				// against the hitpoints you are missing and not against the ones you have
+				heal = Math.max(heal, change.getTheoretical());
 				unhealed(change);
 			}
 
@@ -436,7 +571,7 @@ class PotionBoostsOverlay extends Overlay
 			}
 		}
 
-		return new Item(shown(changed), skills || !heals);
+		return new Item(shown(changed), skills || !heals, heal);
 	}
 
 	/**
@@ -583,7 +718,8 @@ class PotionBoostsOverlay extends Overlay
 	 * one is the setting: whichever of them is nearer the corner it names.
 	 *
 	 * <p>Unless food is asked for, this is also where food goes, which is anything that heals you and
-	 * does nothing else but put your run back.
+	 * does nothing else but put your run back. One of the three to eat together is kept whether food was
+	 * asked for or not, since it was marked for being worth eating now.
 	 */
 	private List<Potion> chosen(List<Potion> potions)
 	{
@@ -591,7 +727,7 @@ class PotionBoostsOverlay extends Overlay
 
 		for (Potion potion : potions)
 		{
-			if (!config.food() && !potion.potion)
+			if (!config.food() && !potion.potion && !potion.combo)
 			{
 				continue;
 			}
@@ -650,11 +786,19 @@ class PotionBoostsOverlay extends Overlay
 	 * <p>Past a few skills the rows go up two abreast, since a slot is wide enough for two of them and a
 	 * brew moving six skills down one column leaves each row too short to read. They read across before
 	 * they read down, the way a list does.
+	 *
+	 * <p>One of the three to eat together has its healing outlined, so that the three of them read as the
+	 * one thing to do rather than as three slots that happen to be labelled.
 	 */
 	private void draw(Graphics2D graphics, FontMetrics metrics, Potion potion)
 	{
 		Rectangle bounds = potion.bounds;
 		int count = potion.changes.size();
+
+		if (count == 0)
+		{
+			return;
+		}
 
 		int columns = count > CROWDED ? 2 : 1;
 		int rows = (count + columns - 1) / columns;
@@ -704,10 +848,33 @@ class PotionBoostsOverlay extends Overlay
 			}
 
 			int baseline = y + (height + metrics.getAscent()) / 2 - 1;
+			StatChange change = potion.changes.get(at);
+			Color colour = colour(change);
 
+			// What one of the three to eat together is marked by is its own healing gone around rather than
+			// only shadowed, so that the number goes on reading as the healing it is and the three of them
+			// still stand out of a full inventory
 			graphics.setColor(Color.BLACK);
-			graphics.drawString(labels[at], x + 1, baseline + 1);
-			graphics.setColor(colour(potion.changes.get(at)));
+
+			if (potion.combo && change.getStat() == Stats.HITPOINTS)
+			{
+				for (int alongX = -1; alongX <= 1; alongX++)
+				{
+					for (int alongY = -1; alongY <= 1; alongY++)
+					{
+						if (alongX != 0 || alongY != 0)
+						{
+							graphics.drawString(labels[at], x + alongX, baseline + alongY);
+						}
+					}
+				}
+			}
+			else
+			{
+				graphics.drawString(labels[at], x + 1, baseline + 1);
+			}
+
+			graphics.setColor(colour);
 			graphics.drawString(labels[at], x, baseline);
 		}
 	}
@@ -876,7 +1043,7 @@ class PotionBoostsOverlay extends Overlay
 	 */
 	private static class Item
 	{
-		private static final Item NOTHING = new Item(List.of(), false);
+		private static final Item NOTHING = new Item(List.of(), false, 0);
 
 		private final List<StatChange> rows;
 
@@ -885,10 +1052,17 @@ class PotionBoostsOverlay extends Overlay
 		 */
 		private final boolean potion;
 
-		private Item(List<StatChange> rows, boolean potion)
+		/**
+		 * The hitpoints it would heal with none of you missing taken out of it, which is what three of them
+		 * are added up against.
+		 */
+		private final int heal;
+
+		private Item(List<StatChange> rows, boolean potion, int heal)
 		{
 			this.rows = rows;
 			this.potion = potion;
+			this.heal = heal;
 		}
 	}
 
@@ -912,15 +1086,21 @@ class PotionBoostsOverlay extends Overlay
 		private final int item;
 		private final int slot;
 		private final boolean potion;
+
+		/** Whether it is one of the three worth eating together as things stand. */
+		private final boolean combo;
+
 		private int dose;
 
-		private Potion(Rectangle bounds, List<StatChange> changes, int item, int slot, boolean potion)
+		private Potion(
+			Rectangle bounds, List<StatChange> changes, int item, int slot, boolean potion, boolean combo)
 		{
 			this.bounds = bounds;
 			this.changes = changes;
 			this.item = item;
 			this.slot = slot;
 			this.potion = potion;
+			this.combo = combo;
 		}
 	}
 }
