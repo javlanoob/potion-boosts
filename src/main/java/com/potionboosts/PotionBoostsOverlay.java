@@ -63,9 +63,9 @@ class PotionBoostsOverlay extends Overlay
 	private static final int SLOTS = COLUMNS * ROWS;
 
 	/**
-	 * What is left when the skills you do not fight with are left out: the seven a fight is had with, and
-	 * run energy, which is not a skill to be choosing between in the first place and is run down fighting
-	 * the same as anywhere else.
+	 * What is left when the skills you do not fight with are left out: the seven a fight is had with and
+	 * nothing else. Run energy is not one of them, so a stamina or an energy potion goes unlabelled here
+	 * the same as a herblore boost does, and is shown by naming it in the skills to show.
 	 */
 	private static final Set<Stat> FIGHTING = ImmutableSet.of(
 		Stats.ATTACK,
@@ -74,8 +74,7 @@ class PotionBoostsOverlay extends Overlay
 		Stats.RANGED,
 		Stats.MAGIC,
 		Stats.HITPOINTS,
-		Stats.PRAYER,
-		Stats.RUN_ENERGY);
+		Stats.PRAYER);
 
 	/**
 	 * The cooked karambwans, which are the one food that goes down on top of another rather than in place
