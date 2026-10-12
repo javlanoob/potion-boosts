@@ -82,7 +82,7 @@ class Levels implements InvocationHandler
 	}
 
 	/** Whether a game is being played, rather than the lobby being stood in or the island being left. */
-	private boolean playing()
+	boolean playing()
 	{
 		return client.getVarbitValue(VarbitID.BR_INGAME) != 0;
 	}

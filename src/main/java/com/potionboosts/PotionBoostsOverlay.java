@@ -567,6 +567,11 @@ class PotionBoostsOverlay extends Overlay
 				unhealed(change);
 			}
 
+			if (stat == Stats.DEFENCE)
+			{
+				unboosted(change);
+			}
+
 			if (SkillIcons.of(stat) != SkillIcons.NONE)
 			{
 				changed.add(change);
@@ -603,6 +608,25 @@ class PotionBoostsOverlay extends Overlay
 		change.setAbsolute(change.getAbsolute() - change.getRelative() + relative);
 		change.setRelative(relative);
 		change.setPositivity(relative > 0 ? Positivity.BETTER_CAPPED : Positivity.NO_CHANGE);
+	}
+
+	/**
+	 * A defence row with nothing in it while a Last Man Standing game is running, where the level the
+	 * minigame gives you is the level you fight at and nothing puts it up. The row is left reading as
+	 * nothing to gain rather than taken out here, so the setting for a skill with nothing to gain is what
+	 * says whether it is drawn, and what a brew takes off a skill is left where it is.
+	 */
+	private void unboosted(StatChange change)
+	{
+		if (change.getRelative() <= 0 || !levels.playing())
+		{
+			return;
+		}
+
+		change.setAbsolute(client.getBoostedSkillLevel(Skill.DEFENCE));
+		change.setRelative(0);
+		change.setTheoretical(0);
+		change.setPositivity(Positivity.NO_CHANGE);
 	}
 
 	/**
