@@ -147,6 +147,7 @@ class PotionBoostsOverlay extends Overlay
 	private static final int SOLID = 128;
 
 	private final Client client;
+	private final Levels levels;
 	private final ItemManager itemManager;
 	private final ItemStatChanges statChanges;
 	private final SpriteManager spriteManager;
@@ -201,6 +202,7 @@ class PotionBoostsOverlay extends Overlay
 	@Inject
 	PotionBoostsOverlay(
 		Client client,
+		Levels levels,
 		ItemManager itemManager,
 		ItemStatChanges statChanges,
 		SpriteManager spriteManager,
@@ -219,6 +221,7 @@ class PotionBoostsOverlay extends Overlay
 		setPriority(PRIORITY_LOW - 1f);
 
 		this.client = client;
+		this.levels = levels;
 		this.itemManager = itemManager;
 		this.statChanges = statChanges;
 		this.spriteManager = spriteManager;
@@ -414,7 +417,7 @@ class PotionBoostsOverlay extends Overlay
 	private int headroom()
 	{
 		int tier = client.getVarbitValue(FRAILTY);
-		int ceiling = tier > 0 ? hitpoints(tier) : client.getRealSkillLevel(Skill.HITPOINTS);
+		int ceiling = tier > 0 ? hitpoints(tier) : levels.real(Skill.HITPOINTS);
 
 		return ceiling - client.getBoostedSkillLevel(Skill.HITPOINTS);
 	}
@@ -532,7 +535,7 @@ class PotionBoostsOverlay extends Overlay
 			return Item.NOTHING;
 		}
 
-		StatsChanges stats = effect.calculate(client);
+		StatsChanges stats = effect.calculate(levels.client());
 
 		if (stats == null || stats.getStatChanges() == null)
 		{
@@ -610,7 +613,7 @@ class PotionBoostsOverlay extends Overlay
 	 */
 	private int hitpoints(int tier)
 	{
-		int max = client.getRealSkillLevel(Skill.HITPOINTS);
+		int max = levels.real(Skill.HITPOINTS);
 		int taken = FRAIL[Math.min(tier, FRAIL.length - 1)];
 		int level = Math.min(Experience.MAX_REAL_LEVEL,
 			Experience.getLevelForXp(client.getSkillExperience(Skill.HITPOINTS)));
