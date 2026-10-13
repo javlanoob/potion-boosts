@@ -147,7 +147,7 @@ class PotionBoostsOverlay extends Overlay
 	private static final int SOLID = 128;
 
 	private final Client client;
-	private final Levels levels;
+	private final Lms lms;
 	private final ItemManager itemManager;
 	private final ItemStatChanges statChanges;
 	private final SpriteManager spriteManager;
@@ -202,7 +202,7 @@ class PotionBoostsOverlay extends Overlay
 	@Inject
 	PotionBoostsOverlay(
 		Client client,
-		Levels levels,
+		Lms lms,
 		ItemManager itemManager,
 		ItemStatChanges statChanges,
 		SpriteManager spriteManager,
@@ -221,7 +221,7 @@ class PotionBoostsOverlay extends Overlay
 		setPriority(PRIORITY_LOW - 1f);
 
 		this.client = client;
-		this.levels = levels;
+		this.lms = lms;
 		this.itemManager = itemManager;
 		this.statChanges = statChanges;
 		this.spriteManager = spriteManager;
@@ -417,7 +417,7 @@ class PotionBoostsOverlay extends Overlay
 	private int headroom()
 	{
 		int tier = client.getVarbitValue(FRAILTY);
-		int ceiling = tier > 0 ? hitpoints(tier) : levels.real(Skill.HITPOINTS);
+		int ceiling = tier > 0 ? hitpoints(tier) : lms.hitpoints();
 
 		return ceiling - client.getBoostedSkillLevel(Skill.HITPOINTS);
 	}
@@ -525,6 +525,9 @@ class PotionBoostsOverlay extends Overlay
 	 *
 	 * <p>The skills touched are read whether the item would move them this tick or not, so a potion
 	 * does not turn into food for as long as you have nothing to restore.
+	 *
+	 * <p>The few items a Last Man Standing game hands you are worked out from the levels the build is
+	 * given instead, which the game boosts from and the client does not report.
 	 */
 	private Item itemOf(int id)
 	{
@@ -535,7 +538,12 @@ class PotionBoostsOverlay extends Overlay
 			return Item.NOTHING;
 		}
 
-		StatsChanges stats = effect.calculate(levels.client());
+		StatsChanges stats = lms.changes(id);
+
+		if (stats == null)
+		{
+			stats = effect.calculate(client);
+		}
 
 		if (stats == null || stats.getStatChanges() == null)
 		{
@@ -565,11 +573,6 @@ class PotionBoostsOverlay extends Overlay
 				// against the hitpoints you are missing and not against the ones you have
 				heal = Math.max(heal, change.getTheoretical());
 				unhealed(change);
-			}
-
-			if (stat == Stats.DEFENCE)
-			{
-				unboosted(change);
 			}
 
 			if (SkillIcons.of(stat) != SkillIcons.NONE)
@@ -611,25 +614,6 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * A defence row with nothing in it while a Last Man Standing game is running, where the level the
-	 * minigame gives you is the level you fight at and nothing puts it up. The row is left reading as
-	 * nothing to gain rather than taken out here, so the setting for a skill with nothing to gain is what
-	 * says whether it is drawn, and what a brew takes off a skill is left where it is.
-	 */
-	private void unboosted(StatChange change)
-	{
-		if (change.getRelative() <= 0 || !levels.playing())
-		{
-			return;
-		}
-
-		change.setAbsolute(client.getBoostedSkillLevel(Skill.DEFENCE));
-		change.setRelative(0);
-		change.setTheoretical(0);
-		change.setPositivity(Positivity.NO_CHANGE);
-	}
-
-	/**
 	 * The hitpoints the invocation leaves you to be healed to, out of the tiers of it you took. What it
 	 * leaves is worked out from the level your experience comes to rather than from the
 	 * level the game reports, so that taking a tenth off a level the game has already taken a tenth off
@@ -637,7 +621,7 @@ class PotionBoostsOverlay extends Overlay
 	 */
 	private int hitpoints(int tier)
 	{
-		int max = levels.real(Skill.HITPOINTS);
+		int max = lms.hitpoints();
 		int taken = FRAIL[Math.min(tier, FRAIL.length - 1)];
 		int level = Math.min(Experience.MAX_REAL_LEVEL,
 			Experience.getLevelForXp(client.getSkillExperience(Skill.HITPOINTS)));
