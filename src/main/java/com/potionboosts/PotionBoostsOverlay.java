@@ -931,7 +931,7 @@ class PotionBoostsOverlay extends Overlay
 		String number = number(change, columns);
 
 		return mark == PotionBoostsConfig.Mark.LETTER
-			? SkillIcons.letterOf(change.getStat()) + number
+			? SkillIcons.letterOf(change.getStat()) + " " + number
 			: number;
 	}
 
