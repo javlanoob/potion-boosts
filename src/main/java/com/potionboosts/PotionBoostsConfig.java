@@ -11,6 +11,12 @@ public interface PotionBoostsConfig extends Config
 {
 	String GROUP = "potionboosts";
 
+	enum Number
+	{
+		BOOST,
+		LEVEL
+	}
+
 	/**
 	 * What goes beside a number to say which skill it is for.
 	 */
@@ -19,12 +25,6 @@ public interface PotionBoostsConfig extends Config
 		ICON,
 		LETTER,
 		NONE
-	}
-
-	enum Number
-	{
-		BOOST,
-		LEVEL
 	}
 
 	/**
@@ -70,10 +70,32 @@ public interface PotionBoostsConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "mark",
+		name = "Icons",
+		description = "What goes beside the number: the skill icon, the first letter of the skill, or nothing",
+		position = 2
+	)
+	default Mark mark()
+	{
+		return Mark.ICON;
+	}
+
+	@ConfigItem(
+		keyName = "prioritize",
+		name = "Prioritize",
+		description = "Which one it goes on when several are down to the same dose",
+		position = 3
+	)
+	default Prioritize prioritize()
+	{
+		return Prioritize.TOP_LEFT;
+	}
+
+	@ConfigItem(
 		keyName = "combatOnly",
 		name = "Combat only",
 		description = "Leave out the skills you do not fight with",
-		position = 2
+		position = 4
 	)
 	default boolean combatOnly()
 	{
@@ -84,7 +106,7 @@ public interface PotionBoostsConfig extends Config
 		keyName = "drains",
 		name = "Show drains",
 		description = "Show what a potion takes away as well as what it gives",
-		position = 3
+		position = 5
 	)
 	default boolean drains()
 	{
@@ -95,7 +117,7 @@ public interface PotionBoostsConfig extends Config
 		keyName = "food",
 		name = "Include food",
 		description = "Label what only heals or restores too, not only what boosts",
-		position = 4
+		position = 6
 	)
 	default boolean food()
 	{
@@ -106,11 +128,44 @@ public interface PotionBoostsConfig extends Config
 		keyName = "noChange",
 		name = "Show no change",
 		description = "Label a skill with nothing left to gain as well",
-		position = 5
+		position = 7
 	)
 	default boolean noChange()
 	{
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "tripleEat",
+		name = "Triple eat",
+		description = "Mark the food, karambwan and brew to eat together once none of it would go to waste",
+		position = 8
+	)
+	default boolean tripleEat()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "customColour",
+		name = "Custom colour",
+		description = "Draw the numbers in a colour of your own rather than in the Item Stats colours",
+		position = 9
+	)
+	default boolean customColour()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "colour",
+		name = "Colour",
+		description = "The colour to draw them in, where custom colour is on",
+		position = 10
+	)
+	default Color colour()
+	{
+		return Color.WHITE;
 	}
 
 	@Range(max = 20)
@@ -118,7 +173,7 @@ public interface PotionBoostsConfig extends Config
 		keyName = "minimum",
 		name = "Minimum",
 		description = "Leave out a skill that would move by less than this",
-		position = 6
+		position = 11
 	)
 	default int minimum()
 	{
@@ -130,7 +185,7 @@ public interface PotionBoostsConfig extends Config
 		keyName = "transparency",
 		name = "Transparency",
 		description = "How far to see the potion through what is drawn over it",
-		position = 7
+		position = 12
 	)
 	default int transparency()
 	{
@@ -138,21 +193,10 @@ public interface PotionBoostsConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "prioritize",
-		name = "Prioritize",
-		description = "Which one it goes on when several are down to the same dose",
-		position = 8
-	)
-	default Prioritize prioritize()
-	{
-		return Prioritize.TOP_LEFT;
-	}
-
-	@ConfigItem(
 		keyName = "shownSkills",
 		name = "Shown skills",
 		description = "Separated by commas, and read in place of combat only",
-		position = 9
+		position = 13
 	)
 	default String shownSkills()
 	{
@@ -163,54 +207,10 @@ public interface PotionBoostsConfig extends Config
 		keyName = "hiddenSkills",
 		name = "Hidden skills",
 		description = "Separated by commas, and left out whatever else would show them",
-		position = 10
+		position = 14
 	)
 	default String hiddenSkills()
 	{
 		return "";
-	}
-
-	@ConfigItem(
-		keyName = "customColour",
-		name = "Custom colour",
-		description = "Draw the numbers in a colour of your own rather than in the Item Stats colours",
-		position = 12
-	)
-	default boolean customColour()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "colour",
-		name = "Colour",
-		description = "The colour to draw them in, where custom colour is on",
-		position = 13
-	)
-	default Color colour()
-	{
-		return Color.WHITE;
-	}
-
-	@ConfigItem(
-		keyName = "mark",
-		name = "Icons",
-		description = "What goes beside the number: the skill icon, the first letter of the skill, or nothing",
-		position = 14
-	)
-	default Mark mark()
-	{
-		return Mark.ICON;
-	}
-
-	@ConfigItem(
-		keyName = "tripleEat",
-		name = "Triple eat",
-		description = "Mark the food, karambwan and brew to eat together once none of it would go to waste",
-		position = 11
-	)
-	default boolean tripleEat()
-	{
-		return false;
 	}
 }
