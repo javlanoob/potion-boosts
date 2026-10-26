@@ -930,9 +930,14 @@ class PotionBoostsOverlay extends Overlay
 	{
 		String number = number(change, columns);
 
-		return mark == PotionBoostsConfig.Mark.LETTER
-			? SkillIcons.letterOf(change.getStat()) + " " + number
-			: number;
+		if (mark != PotionBoostsConfig.Mark.LETTER)
+		{
+			return number;
+		}
+
+		// Side by side the letter goes right up against the number, the way the plus in front of a boost
+		// is dropped there: twenty one pixels is no room for a space on top of both of them
+		return SkillIcons.letterOf(change.getStat()) + (columns > 1 ? "" : " ") + number;
 	}
 
 	/**
