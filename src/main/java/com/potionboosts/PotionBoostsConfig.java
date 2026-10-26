@@ -11,6 +11,16 @@ public interface PotionBoostsConfig extends Config
 {
 	String GROUP = "potionboosts";
 
+	/**
+	 * What goes beside a number to say which skill it is for.
+	 */
+	enum Mark
+	{
+		ICON,
+		LETTER,
+		NONE
+	}
+
 	enum Number
 	{
 		BOOST,
@@ -183,14 +193,14 @@ public interface PotionBoostsConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "hideIcons",
-		name = "Hide icons",
-		description = "Label a potion with the number alone, without the skill icon beside it",
+		keyName = "mark",
+		name = "Icons",
+		description = "What goes beside the number: the skill icon, the first letter of the skill, or nothing",
 		position = 14
 	)
-	default boolean hideIcons()
+	default Mark mark()
 	{
-		return false;
+		return Mark.ICON;
 	}
 
 	@ConfigItem(

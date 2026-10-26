@@ -1,6 +1,7 @@
 package com.potionboosts;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Locale;
 import java.util.Map;
 import net.runelite.api.gameval.SpriteID;
 import net.runelite.client.plugins.itemstats.stats.Stat;
@@ -45,6 +46,16 @@ final class SkillIcons
 
 	private SkillIcons()
 	{
+	}
+
+	/**
+	 * The letter a stat goes by where the icons are off, which is the first of its name.
+	 */
+	static String letterOf(Stat stat)
+	{
+		String name = stat.getName();
+
+		return name.isEmpty() ? "" : name.substring(0, 1).toUpperCase(Locale.ROOT);
 	}
 
 	static int of(Stat stat)

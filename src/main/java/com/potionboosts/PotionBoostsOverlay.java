@@ -810,7 +810,8 @@ class PotionBoostsOverlay extends Overlay
 			return;
 		}
 
-		boolean icons = !config.hideIcons();
+		PotionBoostsConfig.Mark mark = config.mark();
+		boolean icons = mark == PotionBoostsConfig.Mark.ICON;
 		int columns = count > CROWDED ? 2 : 1;
 		int rows = (count + columns - 1) / columns;
 		int width = columns == 1 ? bounds.width : (bounds.width + GUTTER) / columns;
@@ -820,7 +821,7 @@ class PotionBoostsOverlay extends Overlay
 
 		for (int at = 0; at < count; at++)
 		{
-			labels[at] = label(potion.changes.get(at), columns);
+			labels[at] = label(potion.changes.get(at), columns, mark);
 			widest = Math.max(widest, metrics.stringWidth(labels[at]));
 		}
 
@@ -922,11 +923,24 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
+	 * What a row reads: the number, with the skill's letter in front of it where that is what is being
+	 * drawn beside it rather than the icon.
+	 */
+	private String label(StatChange change, int columns, PotionBoostsConfig.Mark mark)
+	{
+		String number = number(change, columns);
+
+		return mark == PotionBoostsConfig.Mark.LETTER
+			? SkillIcons.letterOf(change.getStat()) + number
+			: number;
+	}
+
+	/**
 	 * How much it would give, or the level it would take you to, which is the setting. Side by side there
 	 * is no room for the plus in front of a boost, which is seven of the twenty one pixels a column has, and
 	 * nothing is lost by it: what it was saying is said again by the colour, and a drain keeps its minus.
 	 */
-	private String label(StatChange change, int columns)
+	private String number(StatChange change, int columns)
 	{
 		if (config.number() == PotionBoostsConfig.Number.LEVEL)
 		{
