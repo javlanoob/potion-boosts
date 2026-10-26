@@ -1,5 +1,6 @@
 package com.potionboosts;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -157,6 +158,39 @@ public interface PotionBoostsConfig extends Config
 	default String hiddenSkills()
 	{
 		return "";
+	}
+
+	@ConfigItem(
+		keyName = "customColour",
+		name = "Custom colour",
+		description = "Draw the numbers in a colour of your own rather than in the Item Stats colours",
+		position = 12
+	)
+	default boolean customColour()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "colour",
+		name = "Colour",
+		description = "The colour to draw them in, where custom colour is on",
+		position = 13
+	)
+	default Color colour()
+	{
+		return Color.WHITE;
+	}
+
+	@ConfigItem(
+		keyName = "hideIcons",
+		name = "Hide icons",
+		description = "Label a potion with the number alone, without the skill icon beside it",
+		position = 14
+	)
+	default boolean hideIcons()
+	{
+		return false;
 	}
 
 	@ConfigItem(

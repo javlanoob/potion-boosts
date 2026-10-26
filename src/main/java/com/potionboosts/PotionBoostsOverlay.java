@@ -810,6 +810,7 @@ class PotionBoostsOverlay extends Overlay
 			return;
 		}
 
+		boolean icons = !config.hideIcons();
 		int columns = count > CROWDED ? 2 : 1;
 		int rows = (count + columns - 1) / columns;
 		int width = columns == 1 ? bounds.width : (bounds.width + GUTTER) / columns;
@@ -835,7 +836,7 @@ class PotionBoostsOverlay extends Overlay
 
 		for (int at = 0; at < count; at++)
 		{
-			marks[at] = icon(SkillIcons.of(potion.changes.get(at).getStat()), iconHeight);
+			marks[at] = icons ? icon(SkillIcons.of(potion.changes.get(at).getStat()), iconHeight) : null;
 			reach[at % columns] = Math.max(reach[at % columns],
 				(marks[at] == null ? 0 : marks[at].getWidth()) + metrics.stringWidth(labels[at]));
 		}
@@ -845,10 +846,15 @@ class PotionBoostsOverlay extends Overlay
 		// gives way when that would carry it past the gap to the next slot.
 		int beside = Math.min(reach[0], bounds.width + GUTTER - reach[columns - 1]);
 
+		// A number with no icon on the left of it is put in the middle of the room it has rather than at
+		// the edge the icon was taking up, since the edge of a slot is nothing in particular to read from
+		int indent = icons ? 0 : (bounds.width - (columns == 1 ? reach[0] : beside + reach[columns - 1])) / 2;
+
 		for (int at = 0; at < count; at++)
 		{
 			BufferedImage icon = marks[at];
-			int x = bounds.x + at % columns * beside;
+			int x = bounds.x + indent + at % columns * beside
+				+ (icons ? 0 : (reach[at % columns] - metrics.stringWidth(labels[at])) / 2);
 			int y = top + at / columns * height;
 
 			if (icon != null)
@@ -894,9 +900,17 @@ class PotionBoostsOverlay extends Overlay
 	 * apart from one you would hardly get any of. Item Stats has a colour between its best and its worst
 	 * that it never puts to use, since anything at all held back by your level is the one colour there, so
 	 * all three are put to use here: all of the boost, most of it, little of it.
+	 *
+	 * <p>Or the one colour out of the settings, where that is what is asked for. That says nothing about
+	 * how much of the boost your level would waste, which is what the colours are otherwise for.
 	 */
 	private Color colour(StatChange change)
 	{
+		if (config.customColour())
+		{
+			return config.colour();
+		}
+
 		Positivity positivity = change.getPositivity();
 
 		if (positivity == Positivity.BETTER_CAPPED && change.getRelative() * 2 >= change.getTheoretical())
