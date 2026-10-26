@@ -816,12 +816,16 @@ class PotionBoostsOverlay extends Overlay
 		int rows = (count + columns - 1) / columns;
 		int width = columns == 1 ? bounds.width : (bounds.width + GUTTER) / columns;
 		int room = Math.min(MAX_ROW, bounds.height / rows);
+		String[] heads = new String[count];
 		String[] labels = new String[count];
 		int widest = 0;
 
 		for (int at = 0; at < count; at++)
 		{
-			labels[at] = label(potion.changes.get(at), columns, mark);
+			StatChange change = potion.changes.get(at);
+
+			heads[at] = head(change, columns, mark);
+			labels[at] = heads[at] + number(change, columns);
 			widest = Math.max(widest, metrics.stringWidth(labels[at]));
 		}
 
@@ -891,8 +895,21 @@ class PotionBoostsOverlay extends Overlay
 				graphics.drawString(labels[at], x + 1, baseline + 1);
 			}
 
-			graphics.setColor(colour);
-			graphics.drawString(labels[at], x, baseline);
+			// A letter is left white whatever the number is coloured, since the colours are there to say how
+			// much of the boost your level has room for and that is nothing to do with which skill it is
+			if (heads[at].isEmpty())
+			{
+				graphics.setColor(colour);
+				graphics.drawString(labels[at], x, baseline);
+			}
+			else
+			{
+				graphics.setColor(Color.WHITE);
+				graphics.drawString(heads[at], x, baseline);
+				graphics.setColor(colour);
+				graphics.drawString(labels[at].substring(heads[at].length()),
+					x + metrics.stringWidth(heads[at]), baseline);
+			}
 		}
 	}
 
@@ -923,21 +940,19 @@ class PotionBoostsOverlay extends Overlay
 	}
 
 	/**
-	 * What a row reads: the number, with the skill's letter in front of it where that is what is being
-	 * drawn beside it rather than the icon.
+	 * What goes in front of the number, which is the skill's letter where that is what marks the row in
+	 * place of the icon, and nothing at all otherwise. Side by side the letter goes right up against the
+	 * number, the way the plus in front of a boost is dropped there: twenty one pixels is no room for a
+	 * space on top of both of them.
 	 */
-	private String label(StatChange change, int columns, PotionBoostsConfig.Mark mark)
+	private String head(StatChange change, int columns, PotionBoostsConfig.Mark mark)
 	{
-		String number = number(change, columns);
-
 		if (mark != PotionBoostsConfig.Mark.LETTER)
 		{
-			return number;
+			return "";
 		}
 
-		// Side by side the letter goes right up against the number, the way the plus in front of a boost
-		// is dropped there: twenty one pixels is no room for a space on top of both of them
-		return SkillIcons.letterOf(change.getStat()) + (columns > 1 ? "" : " ") + number;
+		return SkillIcons.letterOf(change.getStat()) + (columns > 1 ? "" : " ");
 	}
 
 	/**
